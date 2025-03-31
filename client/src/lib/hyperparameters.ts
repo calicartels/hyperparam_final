@@ -342,6 +342,72 @@ export const getHyperparameterInfo = (key: string): HyperparameterInfo | undefin
   return hyperparametersDB[key];
 };
 
+// New: Enhanced hyperparameter info that uses LLM when available
+import { 
+  getHyperparameterExplanation, 
+  checkLLMStatus, 
+  type HyperparameterExplanation, 
+  generateFallbackExplanation 
+} from './llmService';
+
+// Function to get hyperparameter information with LLM enhancement
+export const getEnhancedHyperparameterInfo = async (
+  key: string, 
+  value: string, 
+  codeContext?: string
+): Promise<HyperparameterInfo> => {
+  // First check if we have it in the static database
+  if (hyperparametersDB[key]) {
+    return hyperparametersDB[key];
+  }
+  
+  // If not in static DB, try to get from LLM
+  try {
+    // Check if LLM is available
+    const llmStatus = await checkLLMStatus();
+    
+    if (llmStatus.available) {
+      // Detect framework from the code context
+      const framework = codeContext ? detectFramework(codeContext) : undefined;
+      
+      // Get explanation from LLM
+      const response = await getHyperparameterExplanation({
+        paramName: key,
+        paramValue: value,
+        framework,
+        codeContext
+      });
+      
+      if (response.success && response.explanation) {
+        return convertLLMResponseToHyperparameterInfo(response.explanation);
+      }
+    }
+    
+    // If LLM fails or is unavailable, use fallback
+    return convertLLMResponseToHyperparameterInfo(
+      generateFallbackExplanation(key, value, detectFramework(codeContext || ""))
+    );
+  } catch (error) {
+    console.error("Error getting hyperparameter info:", error);
+    
+    // Use fallback in case of any errors
+    return convertLLMResponseToHyperparameterInfo(
+      generateFallbackExplanation(key, value, detectFramework(codeContext || ""))
+    );
+  }
+};
+
+// Convert the LLM response to our internal HyperparameterInfo format
+const convertLLMResponseToHyperparameterInfo = (llmResponse: HyperparameterExplanation): HyperparameterInfo => {
+  return {
+    name: llmResponse.name,
+    description: llmResponse.description,
+    impact: llmResponse.impact,
+    framework: "Detected", // We don't have this in the LLM response format
+    alternatives: llmResponse.alternatives,
+  };
+};
+
 // Detect framework from imports in code
 export const detectFramework = (code: string): string => {
   // Framework detection patterns

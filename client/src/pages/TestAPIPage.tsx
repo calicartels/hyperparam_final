@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LLMExplanationCard } from '@/components/LLMExplanationCard';
+import { HyperparameterVisualizations } from '@/components/SimpleHyperparameterVisualizations';
 import { checkLLMStatus, getHyperparameterExplanation, generateFallbackExplanation, LLMStatusResponse } from '@/lib/llmService';
 import { Switch } from '@/components/ui/switch';
 import { Tutorial } from '@/components/Tutorial';
@@ -209,8 +210,13 @@ model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['ac
           </Card>
         </div>
         
-        <div>
+        <div className="space-y-6">
           <LLMExplanationCard explanation={explanation} isLoading={isLoading} />
+          <HyperparameterVisualizations 
+            paramName={paramName} 
+            paramValue={paramValue} 
+            framework={framework} 
+          />
         </div>
       </div>
       

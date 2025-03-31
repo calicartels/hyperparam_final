@@ -60,19 +60,17 @@ export function LLMExplanationCard({ explanation, isLoading = false }: LLMExplan
             </div>
           )}
         </div>
-        <CardDescription>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">Impact: </span>
-            <span className={`text-sm px-2 py-0.5 rounded-full ${
-              explanation.impact === 'high' 
-                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' 
-                : explanation.impact === 'medium'
-                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                  : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-            }`}>
-              {explanation.impact.charAt(0).toUpperCase() + explanation.impact.slice(1)}
-            </span>
-          </div>
+        <CardDescription className="flex items-center gap-2">
+          <span className="text-sm font-medium">Impact: </span>
+          <span className={`text-sm px-2 py-0.5 rounded-full ${
+            explanation.impact === 'high' 
+              ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' 
+              : explanation.impact === 'medium'
+                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+          }`}>
+            {explanation.impact.charAt(0).toUpperCase() + explanation.impact.slice(1)}
+          </span>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

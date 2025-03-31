@@ -4,6 +4,72 @@
 let isAnalysisActive = false;
 let hyperparameterSidebar = null;
 let highlightedParameters = [];
+let currentCodeBlock = null; // Store reference to current code block
+let currentCode = ""; // Store the current code being analyzed
+
+// Detect the ML framework used in the code
+function detectFramework(code) {
+  // Check for common framework imports and patterns
+  const frameworkPatterns = {
+    'PyTorch': [
+      /import\s+torch/, 
+      /from\s+torch/, 
+      /nn\.Module/, 
+      /torch\./
+    ],
+    'TensorFlow': [
+      /import\s+tensorflow/, 
+      /from\s+tensorflow/, 
+      /import\s+tf/, 
+      /tf\./
+    ],
+    'Keras': [
+      /import\s+keras/, 
+      /from\s+keras/, 
+      /keras\./,
+      /\.add\(Dense/,
+      /Sequential\(\)/
+    ],
+    'Scikit-learn': [
+      /import\s+sklearn/, 
+      /from\s+sklearn/, 
+      /DecisionTreeClassifier/, 
+      /RandomForestClassifier/,
+      /LogisticRegression/
+    ],
+    'XGBoost': [
+      /import\s+xgboost/, 
+      /from\s+xgboost/, 
+      /XGBClassifier/, 
+      /XGBRegressor/
+    ],
+    'JAX': [
+      /import\s+jax/, 
+      /from\s+jax/, 
+      /jnp\./, 
+      /jax\./
+    ],
+    'Hugging Face': [
+      /from\s+transformers/, 
+      /import\s+transformers/, 
+      /AutoTokenizer/, 
+      /AutoModel/,
+      /pipeline\(/
+    ]
+  };
+  
+  // Check each framework's patterns
+  for (const [framework, patterns] of Object.entries(frameworkPatterns)) {
+    for (const pattern of patterns) {
+      if (pattern.test(code)) {
+        return framework;
+      }
+    }
+  }
+  
+  // Default if no specific framework is detected
+  return "Machine Learning";
+}
 
 // Create and inject the HyperExplainer sidebar into the page
 function createSidebar() {
@@ -133,6 +199,122 @@ function createSidebar() {
     generateButton.style.backgroundColor = '#6366f1';
   });
   
+  // Add click handler for generating alternative code
+  generateButton.addEventListener('click', () => {
+    if (!currentCode || !highlightedParameters.length) {
+      showNotification('Please analyze a code block first');
+      return;
+    }
+    
+    // Get framework from the code
+    const framework = detectFramework(currentCode);
+    
+    // Generate optimized code with advanced alternatives
+    let optimizedCode = currentCode;
+    
+    // Convert the highlightedParameters to include positions
+    const paramsWithPositions = highlightedParameters.map(param => {
+      const pos = currentCode.indexOf(param.value);
+      return {
+        key: param.key,
+        value: param.value,
+        position: { 
+          start: pos, 
+          end: pos + param.value.length 
+        }
+      };
+    });
+    
+    // Sort params in reverse order by position to avoid messing up indices
+    const sortedParams = [...paramsWithPositions].sort(
+      (a, b) => b.position.start - a.position.start
+    );
+    
+    for (const param of sortedParams) {
+      const paramInfo = paramInfoMap[param.key];
+      if (!paramInfo || !paramInfo.alternatives.length) continue;
+      
+      // Choose the most "advanced" alternative
+      const advancedAlt = paramInfo.alternatives.find(alt => alt.type === "advanced");
+      if (advancedAlt) {
+        // Original parameter text (from position.start to position.end)
+        const paramText = currentCode.substring(param.position.start, param.position.end);
+        
+        // Create the replacement text
+        const newParamText = paramText.replace(param.value, advancedAlt.value);
+        
+        // Replace in the optimized code
+        optimizedCode = optimizedCode.substring(0, param.position.start) + 
+                       newParamText + 
+                       optimizedCode.substring(param.position.end);
+      }
+    }
+    
+    // Create a new dialogue to show the alternative code
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10002;
+      font-family: 'Inter', sans-serif;
+    `;
+    
+    dialog.innerHTML = `
+      <div style="background-color: white; width: 800px; max-width: 90%; max-height: 90vh; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
+        <div style="background-color: #6366f1; padding: 16px; display: flex; justify-content: space-between; align-items: center; color: white;">
+          <h3 style="margin: 0; font-weight: 600; font-size: 18px;">Alternative Code with Optimized Hyperparameters</h3>
+          <button id="close-dialog" style="background: none; border: none; color: white; cursor: pointer;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <div style="padding: 16px; max-height: calc(90vh - 120px); overflow-y: auto;">
+          <div style="background-color: #f8fafc; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+            <p style="margin-top: 0; color: #334155; font-size: 14px;">
+              This code has been optimized with advanced hyperparameter configurations for ${framework}. 
+              The optimized version focuses on achieving better model performance.
+            </p>
+          </div>
+          <pre style="background-color: #f1f5f9; border-radius: 8px; padding: 16px; overflow-x: auto; font-family: 'JetBrains Mono', monospace; font-size: 14px; line-height: 1.5; margin: 0;">${optimizedCode}</pre>
+        </div>
+        <div style="border-top: 1px solid #e2e8f0; padding: 16px; display: flex; justify-content: flex-end;">
+          <button id="copy-code" style="background-color: #6366f1; color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 14px; font-weight: 500; cursor: pointer;">
+            Copy Code
+          </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    // Add event listeners to dialog buttons
+    dialog.querySelector('#close-dialog').addEventListener('click', () => {
+      dialog.remove();
+    });
+    
+    dialog.querySelector('#copy-code').addEventListener('click', () => {
+      navigator.clipboard.writeText(optimizedCode).then(() => {
+        showNotification('Code copied to clipboard!');
+      });
+    });
+    
+    // Close when clicking outside the dialog content
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) {
+        dialog.remove();
+      }
+    });
+  });
+  
   const exportButton = document.createElement('button');
   exportButton.textContent = 'Export Parameter Documentation';
   exportButton.style.cssText = `
@@ -153,6 +335,138 @@ function createSidebar() {
   });
   exportButton.addEventListener('mouseout', () => {
     exportButton.style.backgroundColor = 'white';
+  });
+  
+  // Add click handler for exporting parameter documentation
+  exportButton.addEventListener('click', () => {
+    if (!currentCode || !highlightedParameters.length) {
+      showNotification('Please analyze a code block first');
+      return;
+    }
+    
+    // Generate parameter documentation in markdown format
+    const framework = detectFramework(currentCode);
+    
+    // Convert the highlightedParameters to simpler format for docs
+    const paramsForDocs = highlightedParameters.map(param => {
+      return {
+        key: param.key,
+        value: param.value
+      };
+    });
+    
+    // Create markdown documentation
+    let mdDoc = `# Hyperparameter Documentation\n\n`;
+    
+    // Add framework information
+    mdDoc += `## Framework Information\n\n`;
+    mdDoc += `Primary Framework: ${framework}\n\n`;
+    
+    // Add hyperparameter details
+    mdDoc += `## Hyperparameters\n\n`;
+    
+    paramsForDocs.forEach(param => {
+      const paramInfo = paramInfoMap[param.key];
+      if (!paramInfo) return;
+      
+      mdDoc += `### ${paramInfo.name}\n\n`;
+      mdDoc += `**Current Value:** \`${param.value}\`\n\n`;
+      mdDoc += `**Description:** ${paramInfo.description}\n\n`;
+      mdDoc += `**Impact:** ${paramInfo.impact.charAt(0).toUpperCase() + paramInfo.impact.slice(1)}\n\n`;
+      
+      if (paramInfo.alternatives.length > 0) {
+        mdDoc += `**Alternatives:**\n\n`;
+        paramInfo.alternatives.forEach(alt => {
+          mdDoc += `- **${alt.value}**: ${alt.description}\n`;
+        });
+        mdDoc += `\n`;
+      }
+    });
+    
+    // Add references section
+    mdDoc += `## References\n\n`;
+    mdDoc += `- [${framework} Documentation](https://example.com/${framework.toLowerCase()})\n`;
+    mdDoc += `- [Hyperparameter Optimization Guide](https://example.com/hyperparameter-optimization)\n\n`;
+    mdDoc += `Generated by HyperExplainer Chrome Extension - ${new Date().toLocaleDateString()}\n`;
+    
+    // Create a dialog to show the documentation with export options
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10002;
+      font-family: 'Inter', sans-serif;
+    `;
+    
+    dialog.innerHTML = `
+      <div style="background-color: white; width: 800px; max-width: 90%; max-height: 90vh; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
+        <div style="background-color: #6366f1; padding: 16px; display: flex; justify-content: space-between; align-items: center; color: white;">
+          <h3 style="margin: 0; font-weight: 600; font-size: 18px;">Hyperparameter Documentation</h3>
+          <button id="close-dialog" style="background: none; border: none; color: white; cursor: pointer;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <div style="padding: 16px; max-height: calc(90vh - 120px); overflow-y: auto;">
+          <div style="background-color: #f8fafc; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+            <p style="margin-top: 0; color: #334155; font-size: 14px;">
+              This documentation explains the hyperparameters found in your ${framework} code,
+              including their impact and alternative configurations.
+            </p>
+          </div>
+          <pre style="background-color: #f1f5f9; border-radius: 8px; padding: 16px; overflow-x: auto; font-family: 'JetBrains Mono', monospace; font-size: 14px; line-height: 1.5; margin: 0; white-space: pre-wrap;">${mdDoc}</pre>
+        </div>
+        <div style="border-top: 1px solid #e2e8f0; padding: 16px; display: flex; justify-content: flex-end; gap: 8px;">
+          <button id="copy-md" style="background-color: white; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 16px; font-size: 14px; font-weight: 500; cursor: pointer;">
+            Copy Markdown
+          </button>
+          <button id="download-md" style="background-color: #6366f1; color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 14px; font-weight: 500; cursor: pointer;">
+            Download as MD
+          </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    // Add event listeners to dialog buttons
+    dialog.querySelector('#close-dialog').addEventListener('click', () => {
+      dialog.remove();
+    });
+    
+    dialog.querySelector('#copy-md').addEventListener('click', () => {
+      navigator.clipboard.writeText(mdDoc).then(() => {
+        showNotification('Documentation copied to clipboard!');
+      });
+    });
+    
+    dialog.querySelector('#download-md').addEventListener('click', () => {
+      // Create a blob and download it
+      const blob = new Blob([mdDoc], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `hyperparameters-${framework.toLowerCase()}-${new Date().toISOString().split('T')[0]}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showNotification('Documentation downloaded!');
+    });
+    
+    // Close when clicking outside the dialog content
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) {
+        dialog.remove();
+      }
+    });
   });
   
   footer.appendChild(generateButton);
@@ -231,32 +545,60 @@ function processCodeBlocks() {
 
 // Analyze a code block for hyperparameters
 function analyzeCodeBlock(codeBlock) {
-  const code = codeBlock.textContent;
+  // Store current code block and code text
+  currentCodeBlock = codeBlock;
+  currentCode = codeBlock.textContent;
   
   // Clear previously highlighted parameters
   highlightedParameters = [];
   
   // Basic patterns to identify common hyperparameters
   const patterns = [
+    // Learning rates
     { regex: /lr\s*=\s*([\d.]+)/g, key: "learning_rate" },
     { regex: /learning_rate\s*=\s*([\d.]+)/g, key: "learning_rate" },
+    { regex: /LearningRateScheduler\([\s\S]*?([\d.]+)/g, key: "learning_rate" },
+    
+    // Batch sizes
     { regex: /batch_size\s*=\s*(\d+)/g, key: "batch_size" },
+    { regex: /batchSize\s*=\s*(\d+)/g, key: "batch_size" },
+    { regex: /batch_size:\s*(\d+)/g, key: "batch_size" },
+    
+    // Dropout
     { regex: /dropout\s*\(\s*([\d.]+)\s*\)/g, key: "dropout_rate" },
     { regex: /dropout\s*=\s*([\d.]+)/g, key: "dropout_rate" },
+    { regex: /Dropout\(([\d.]+)\)/g, key: "dropout_rate" },
+    
+    // Epochs
     { regex: /epochs\s*=\s*(\d+)/g, key: "num_epochs" },
-    { regex: /weight_decay\s*=\s*([\d.]+)/g, key: "weight_decay" }
+    { regex: /num_epochs\s*=\s*(\d+)/g, key: "num_epochs" },
+    { regex: /n_epochs\s*=\s*(\d+)/g, key: "num_epochs" },
+    
+    // Weight decay
+    { regex: /weight_decay\s*=\s*([\d.]+)/g, key: "weight_decay" },
+    { regex: /decay\s*=\s*([\d.]+)/g, key: "weight_decay" },
+    
+    // Optimizers
+    { regex: /optimizer\s*=\s*['"]?(\w+)['"]?/g, key: "optimizer" },
+    
+    // Other hyperparameters
+    { regex: /n_estimators\s*=\s*(\d+)/g, key: "n_estimators" },
+    { regex: /max_depth\s*=\s*(\d+|None)/g, key: "max_depth" },
+    { regex: /hidden_size\s*=\s*(\d+)/g, key: "hidden_size" },
+    { regex: /hidden_dim\s*=\s*(\d+)/g, key: "hidden_size" },
+    { regex: /embedding_dim\s*=\s*(\d+)/g, key: "embedding_dim" }
   ];
   
   // Tokenize the code and replace with highlighted spans
-  let tokenizedCode = code;
+  let tokenizedCode = currentCode;
   let offset = 0;
   
   patterns.forEach(pattern => {
     let match;
-    while ((match = pattern.regex.exec(code)) !== null) {
+    while ((match = pattern.regex.exec(currentCode)) !== null) {
       const fullMatch = match[0];
       const paramValue = match[1];
-      const startPos = match.index + code.substring(match.index).indexOf(paramValue);
+      const startPos = match.index + currentCode.substring(match.index).indexOf(paramValue);
       const endPos = startPos + paramValue.length;
       
       // Create an object to track this parameter
@@ -272,18 +614,18 @@ function analyzeCodeBlock(codeBlock) {
   
   // Create highlighted spans for the parameters
   const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = code;
+  tempDiv.innerHTML = currentCode;
   
   // Sort parameters by their position in reverse order to avoid messing up indices
   highlightedParameters.sort((a, b) => {
-    const aIndex = code.indexOf(a.value);
-    const bIndex = code.indexOf(b.value);
+    const aIndex = currentCode.indexOf(a.value);
+    const bIndex = currentCode.indexOf(b.value);
     return bIndex - aIndex;
   });
   
   highlightedParameters.forEach(param => {
     // Find the text to replace
-    const pos = code.indexOf(param.value);
+    const pos = currentCode.indexOf(param.value);
     if (pos !== -1) {
       const beforeText = tokenizedCode.substring(0, pos);
       const afterText = tokenizedCode.substring(pos + param.value.length);

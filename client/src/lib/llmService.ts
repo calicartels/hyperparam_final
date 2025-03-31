@@ -58,13 +58,13 @@ export interface LLMStatusResponse {
  * @returns Promise with LLM status
  */
 export async function checkLLMStatus(): Promise<LLMStatusResponse> {
-  const response = await apiRequest({
+  const response = await apiRequest<LLMStatusResponse>({
     method: "GET",
     url: "/api/llm/status",
     on401: "returnNull",
   });
   
-  return response as LLMStatusResponse;
+  return response;
 }
 
 /**
@@ -75,14 +75,14 @@ export async function checkLLMStatus(): Promise<LLMStatusResponse> {
 export async function getHyperparameterExplanation(
   request: ExplainHyperparameterRequest
 ): Promise<LLMExplanationResponse> {
-  const response = await apiRequest({
+  const response = await apiRequest<LLMExplanationResponse>({
     method: "POST",
     url: "/api/llm/explain-hyperparameter",
     body: request,
     on401: "returnNull",
   });
   
-  return response as LLMExplanationResponse;
+  return response;
 }
 
 /**

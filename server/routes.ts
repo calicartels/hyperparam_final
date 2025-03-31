@@ -12,8 +12,13 @@ function initializeVertexAI() {
   try {
     // Check if we have the required environment variables
     if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      const projectId = process.env.GOOGLE_CLOUD_PROJECT || "";
-      const location = process.env.GOOGLE_CLOUD_LOCATION || "us-central1";
+      const projectId = process.env.GOOGLE_PROJECT_ID || "";
+      const location = process.env.GOOGLE_LOCATION || "us-central1";
+      
+      if (!projectId) {
+        console.log("Google Cloud Project ID not provided");
+        return false;
+      }
       
       vertexai = new VertexAI({
         project: projectId,

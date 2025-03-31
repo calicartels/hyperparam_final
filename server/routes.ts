@@ -10,27 +10,33 @@ let vertexai: VertexAI | null = null;
 // This function will initialize Vertex AI if credentials are available
 function initializeVertexAI() {
   try {
-    // Check if we have the required environment variables
-    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      const projectId = process.env.GOOGLE_PROJECT_ID || "";
-      const location = process.env.GOOGLE_LOCATION || "us-central1";
-      
-      if (!projectId) {
-        console.log("Google Cloud Project ID not provided");
-        return false;
-      }
-      
-      vertexai = new VertexAI({
-        project: projectId,
-        location: location
-      });
-      
-      console.log("VertexAI initialized successfully");
-      return true;
-    } else {
-      console.log("Google Cloud credentials not provided");
+    const projectId = process.env.GOOGLE_PROJECT_ID || "";
+    const location = process.env.GOOGLE_LOCATION || "us-central1";
+    
+    if (!projectId) {
+      console.log("Google Cloud Project ID not provided");
       return false;
     }
+    
+    // Check if GOOGLE_APPLICATION_CREDENTIALS is set
+    if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      console.log("Google Cloud credentials path not set in environment variables");
+      console.log("Using credentials directory from project setup");
+    }
+    
+    vertexai = new VertexAI({
+      project: projectId,
+      location: location
+    });
+    
+    console.log("VertexAI initialized successfully");
+    console.log(`Using project: ${projectId}, location: ${location}`);
+    
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      console.log(`Using credentials from: ${process.env.GOOGLE_APPLICATION_CREDENTIALS}`);
+    }
+    
+    return true;
   } catch (error) {
     console.error("Error initializing VertexAI:", error);
     return false;

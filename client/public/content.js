@@ -785,6 +785,15 @@ function showParameterDetails(paramKey, paramValue) {
             </span>
           </div>
         </div>
+        
+        <div style="margin-bottom: 16px;">
+          <h4 style="font-size: 14px; font-weight: 600; color: #334155; margin-bottom: 8px;">Visualization</h4>
+          <div id="param-visualization-${paramKey}" style="margin-top: 8px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
+            <div class="visualization-loading" style="text-align: center; padding: 20px; color: #64748b;">
+              <p>Loading visualization...</p>
+            </div>
+          </div>
+        </div>
 
         <div>
           <h4 style="font-size: 14px; font-weight: 600; color: #334155; margin-bottom: 8px;">Alternatives</h4>
@@ -836,6 +845,29 @@ function showParameterDetails(paramKey, paramValue) {
       </div>
     </div>
   `;
+  
+  // Initialize visualization after the card is added to the DOM
+  setTimeout(() => {
+    // Check if the visualization container exists
+    const vizContainer = document.getElementById(`param-visualization-${paramKey}`);
+    if (vizContainer && window.createHyperparameterVisualization) {
+      // Clear loading message
+      vizContainer.innerHTML = '';
+      
+      // Create the visualization
+      try {
+        const createVisualization = window.createHyperparameterVisualization(paramKey, paramValue);
+        createVisualization(vizContainer);
+      } catch (error) {
+        console.error('Error creating visualization:', error);
+        vizContainer.innerHTML = `
+          <div style="text-align: center; padding: 20px; color: #64748b;">
+            <p>Unable to load visualization.</p>
+          </div>
+        `;
+      }
+    }
+  }, 300); // Short delay to ensure DOM is ready and Chart.js is loaded
 }
 
 // Show a notification
@@ -958,6 +990,16 @@ const fontLink = document.createElement('link');
 fontLink.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap';
 fontLink.rel = 'stylesheet';
 document.head.appendChild(fontLink);
+
+// Load Chart.js for visualizations
+const chartScript = document.createElement('script');
+chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+document.head.appendChild(chartScript);
+
+// Load visualizations script
+const visualizationsScript = document.createElement('script');
+visualizationsScript.src = chrome.runtime.getURL('visualizations.js');
+document.head.appendChild(visualizationsScript);
 
 // Initial process of code blocks (in case they're already on the page)
 setTimeout(() => {

@@ -37,7 +37,7 @@
   "options_page": "index.html#/options",
   "web_accessible_resources": [
     {
-      "resources": ["icons/*.png"],
+      "resources": ["icons/*.png", "visualizations.js"],
       "matches": ["*://*.openai.com/*"]
     }
   ]

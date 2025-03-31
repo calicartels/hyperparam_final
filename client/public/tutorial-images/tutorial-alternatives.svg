@@ -1,0 +1,37 @@
+<svg width="500" height="250" viewBox="0 0 500 250" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="500" height="250" rx="8" fill="#FFFFFF"/>
+  
+  <!-- Card background -->
+  <rect x="10" y="10" width="480" height="230" rx="6" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="2"/>
+  
+  <!-- Header -->
+  <rect x="20" y="20" width="460" height="30" rx="4" fill="#F1F5F9"/>
+  <rect x="30" y="30" width="150" height="10" rx="2" fill="#64748B"/>
+  
+  <!-- Alternative 1 - Higher -->
+  <rect x="20" y="60" width="460" height="50" rx="4" fill="#FEF2F2"/>
+  <rect x="30" y="70" width="80" height="14" rx="2" fill="#EF4444"/>
+  <rect x="30" y="90" width="300" height="10" rx="2" fill="#FB7185"/>
+  <rect x="400" y="70" width="50" height="20" rx="10" fill="#FEE2E2"/>
+  <rect x="405" y="75" width="40" height="10" rx="2" fill="#EF4444"/>
+  
+  <!-- Alternative 2 - Lower -->
+  <rect x="20" y="120" width="460" height="50" rx="4" fill="#ECFDF5"/>
+  <rect x="30" y="130" width="80" height="14" rx="2" fill="#10B981"/>
+  <rect x="30" y="150" width="300" height="10" rx="2" fill="#34D399"/>
+  <rect x="400" y="130" width="50" height="20" rx="10" fill="#D1FAE5"/>
+  <rect x="405" y="135" width="40" height="10" rx="2" fill="#10B981"/>
+  
+  <!-- Alternative 3 - Advanced -->
+  <rect x="20" y="180" width="460" height="50" rx="4" fill="#EFF6FF"/>
+  <rect x="30" y="190" width="80" height="14" rx="2" fill="#3B82F6"/>
+  <rect x="30" y="210" width="300" height="10" rx="2" fill="#60A5FA"/>
+  <rect x="400" y="190" width="50" height="20" rx="10" fill="#DBEAFE"/>
+  <rect x="405" y="195" width="40" height="10" rx="2" fill="#3B82F6"/>
+  
+  <!-- Animated arrows showing suggestion flow -->
+  <path d="M250 50L250 60M250 110L250 120M250 170L250 180" stroke="#94A3B8" stroke-width="2" stroke-dasharray="4 2">
+    <animate attributeName="stroke-dashoffset" from="6" to="0" dur="1s" repeatCount="indefinite" />
+  </path>
+</svg>

@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { LLMExplanationCard } from '@/components/LLMExplanationCard';
 import { checkLLMStatus, getHyperparameterExplanation, generateFallbackExplanation, LLMStatusResponse } from '@/lib/llmService';
 import { Switch } from '@/components/ui/switch';
+import { Tutorial } from '@/components/Tutorial';
+import { useTutorial } from '@/hooks/use-tutorial';
 
 export default function TestAPIPage() {
   const [llmStatus, setLlmStatus] = useState<LLMStatusResponse | null>(null);
@@ -25,6 +27,25 @@ model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['ac
 
   const [useFallback, setUseFallback] = useState(false);
   const [explanation, setExplanation] = useState(generateFallbackExplanation(paramName, paramValue, framework));
+  
+  // Tutorial state management
+  const { showTutorial, completeTutorial, dismissTutorial } = useTutorial();
+  const [isTutorialVisible, setIsTutorialVisible] = useState(false);
+  
+  const handleShowTutorial = () => {
+    setIsTutorialVisible(true);
+    showTutorial();
+  };
+  
+  const handleCompleteTutorial = () => {
+    setIsTutorialVisible(false);
+    completeTutorial();
+  };
+  
+  const handleDismissTutorial = () => {
+    setIsTutorialVisible(false);
+    dismissTutorial();
+  };
 
   // Check LLM status on component mount
   React.useEffect(() => {
@@ -79,6 +100,25 @@ model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['ac
   return (
     <div className="container py-10">
       <h1 className="text-3xl font-bold mb-6">Test HyperExplainer API</h1>
+      
+      <div className="flex justify-end mb-4">
+        <div className="relative">
+          <Button 
+            variant="outline" 
+            onClick={handleShowTutorial}
+            className="gap-2 group transition-all hover:bg-blue-50 hover:border-blue-200"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-blue-500 group-hover:text-blue-600">
+              <path d="M12 16v-4M12 8h.01M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z" 
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span className="text-blue-600 group-hover:text-blue-700">Show Tutorial</span>
+          </Button>
+          <span className="absolute -top-2 -right-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full animate-pulse">
+            NEW
+          </span>
+        </div>
+      </div>
       
       <div className="grid md:grid-cols-2 gap-8">
         <div>
@@ -173,6 +213,13 @@ model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['ac
           <LLMExplanationCard explanation={explanation} isLoading={isLoading} />
         </div>
       </div>
+      
+      {/* Tutorial Component */}
+      <Tutorial 
+        onComplete={handleCompleteTutorial} 
+        onDismiss={handleDismissTutorial} 
+        isVisible={isTutorialVisible} 
+      />
     </div>
   );
 }

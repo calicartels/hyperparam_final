@@ -1,0 +1,53 @@
+<svg width="500" height="250" viewBox="0 0 500 250" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="500" height="250" rx="8" fill="#FFFFFF"/>
+  
+  <!-- Settings panel background -->
+  <rect x="10" y="10" width="480" height="230" rx="6" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="2"/>
+  
+  <!-- Header -->
+  <rect x="20" y="20" width="460" height="40" rx="4" fill="#F1F5F9"/>
+  <rect x="30" y="35" width="200" height="10" rx="2" fill="#64748B"/>
+  <rect x="400" y="27" width="70" height="26" rx="4" fill="#E2E8F0">
+    <animate attributeName="fill" values="#E2E8F0;#CBD5E1;#E2E8F0" dur="2s" repeatCount="indefinite" />
+  </rect>
+  <rect x="410" y="35" width="50" height="10" rx="2" fill="#94A3B8"/>
+  
+  <!-- Settings group 1 -->
+  <rect x="30" y="80" width="440" height="40" rx="4" fill="#F9FAFB"/>
+  <rect x="40" y="90" width="120" height="10" rx="2" fill="#0F172A"/>
+  <rect x="40" y="105" width="250" height="8" rx="1" fill="#CBD5E1"/>
+  <rect x="400" y="85" width="50" height="24" rx="12" fill="#DBEAFE">
+    <animate attributeName="x" values="400;380;400" dur="3s" repeatCount="indefinite" />
+  </rect>
+  <circle cx="425" cy="97" r="8" fill="#3B82F6">
+    <animate attributeName="cx" values="425;405;425" dur="3s" repeatCount="indefinite" />
+  </circle>
+  
+  <!-- Settings group 2 -->
+  <rect x="30" y="130" width="440" height="40" rx="4" fill="#F9FAFB"/>
+  <rect x="40" y="140" width="150" height="10" rx="2" fill="#0F172A"/>
+  <rect x="40" y="155" width="280" height="8" rx="1" fill="#CBD5E1"/>
+  <rect x="380" y="140" width="70" height="20" rx="4" fill="#F1F5F9"/>
+  <rect x="385" y="145" width="60" height="10" rx="2" fill="#94A3B8"/>
+  
+  <!-- Settings group 3 -->
+  <rect x="30" y="180" width="440" height="40" rx="4" fill="#F9FAFB"/>
+  <rect x="40" y="190" width="100" height="10" rx="2" fill="#0F172A"/>
+  <rect x="40" y="205" width="220" height="8" rx="1" fill="#CBD5E1"/>
+  <rect x="400" y="185" width="50" height="24" rx="12" fill="#FEE2E2"/>
+  <circle cx="415" cy="197" r="8" fill="#EF4444"/>
+  
+  <!-- Animated gear -->
+  <g transform="translate(350, 35)">
+    <path fill="#94A3B8" d="M9.38 4.814l-1.004-.595a4 4 0 00.048-.613 4 4 0 00-.048-.613l1.003-.595a.453.453 0 00.194-.577l-.95-1.645a.453.453 0 00-.53-.203l-1.175.324a4.035 4.035 0 00-1.064-.615L6.52.445A.452.452 0 006.073 0h-1.9a.452.452 0 00-.448.445l-.175.885a4.046 4.046 0 00-1.063.615l-1.176-.324a.454.454 0 00-.53.203l-.95 1.645a.452.452 0 00.195.577l1.004.595a4 4 0 00-.048.613 4 4 0 00.048.613l-1.003.595a.453.453 0 00-.194.577l.95 1.645a.453.453 0 00.53.203l1.175-.324a4.035 4.035 0 001.064.615l.176.885A.452.452 0 004.173 10h1.9a.452.452 0 00.448-.445l.175-.885a4.046 4.046 0 001.063-.615l1.176.324a.454.454 0 00.53-.203l.95-1.645a.453.453 0 00-.195-.577zm-4.256 1.519a2.334 2.334 0 01-2.334-2.333 2.334 2.334 0 012.334-2.333 2.334 2.334 0 012.333 2.333 2.334 2.334 0 01-2.333 2.333z">
+      <animateTransform 
+        attributeName="transform"
+        type="rotate"
+        from="0 5.124 5"
+        to="360 5.124 5"
+        dur="10s"
+        repeatCount="indefinite"/>
+    </path>
+  </g>
+</svg>

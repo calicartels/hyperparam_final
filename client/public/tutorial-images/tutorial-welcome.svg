@@ -1,0 +1,51 @@
+<svg width="500" height="250" viewBox="0 0 500 250" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background with gradient -->
+  <rect width="500" height="250" rx="8" fill="url(#paint0_linear)"/>
+  
+  <!-- Logo area -->
+  <circle cx="250" cy="80" r="40" fill="#3B82F6" opacity="0.9">
+    <animate attributeName="r" values="40;42;40" dur="3s" repeatCount="indefinite" />
+  </circle>
+  <circle cx="250" cy="80" r="30" fill="#60A5FA" opacity="0.7">
+    <animate attributeName="r" values="30;32;30" dur="2s" repeatCount="indefinite" />
+  </circle>
+  <circle cx="250" cy="80" r="20" fill="#93C5FD" opacity="0.5">
+    <animate attributeName="r" values="20;22;20" dur="1.5s" repeatCount="indefinite" />
+  </circle>
+  <circle cx="250" cy="80" r="10" fill="#FFFFFF">
+    <animate attributeName="r" values="10;12;10" dur="1s" repeatCount="indefinite" />
+  </circle>
+  
+  <!-- Text elements -->
+  <rect x="150" y="150" width="200" height="15" rx="2" fill="#FFFFFF"/>
+  <rect x="120" y="175" width="260" height="10" rx="2" fill="#E0F2FE"/>
+  <rect x="140" y="195" width="220" height="10" rx="2" fill="#E0F2FE"/>
+  
+  <!-- Animated particles -->
+  <circle cx="150" cy="50" r="3" fill="#FFFFFF" opacity="0.7">
+    <animate attributeName="cy" values="50;45;50" dur="2s" repeatCount="indefinite" />
+  </circle>
+  <circle cx="350" cy="60" r="2" fill="#FFFFFF" opacity="0.5">
+    <animate attributeName="cy" values="60;55;60" dur="3s" repeatCount="indefinite" />
+  </circle>
+  <circle cx="120" cy="100" r="2.5" fill="#FFFFFF" opacity="0.6">
+    <animate attributeName="cy" values="100;105;100" dur="2.5s" repeatCount="indefinite" />
+  </circle>
+  <circle cx="380" cy="120" r="2" fill="#FFFFFF" opacity="0.5">
+    <animate attributeName="cy" values="120;125;120" dur="3.5s" repeatCount="indefinite" />
+  </circle>
+  <circle cx="200" cy="30" r="1.5" fill="#FFFFFF" opacity="0.4">
+    <animate attributeName="cy" values="30;28;30" dur="2s" repeatCount="indefinite" />
+  </circle>
+  <circle cx="300" cy="40" r="1.5" fill="#FFFFFF" opacity="0.4">
+    <animate attributeName="cy" values="40;38;40" dur="3s" repeatCount="indefinite" />
+  </circle>
+  
+  <!-- Definitions -->
+  <defs>
+    <linearGradient id="paint0_linear" x1="0" y1="0" x2="500" y2="250" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1E40AF"/>
+      <stop offset="1" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+</svg>

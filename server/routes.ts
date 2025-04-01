@@ -230,6 +230,86 @@ Format your response as JSON with the following structure:
     }
   });
 
+  // Route to detect hyperparameters with deep learning
+  app.post("/api/llm/detect-hyperparameters", async (req: Request, res: Response) => {
+    try {
+      const { code } = req.body;
+      
+      if (!code) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Missing code to analyze"
+        });
+      }
+      
+      // Check if Vertex AI is initialized
+      if (!vertexai) {
+        const initialized = initializeVertexAI();
+        if (!initialized) {
+          return res.status(503).json({
+            success: false,
+            error: "LLM service not available. Please provide Google Cloud credentials."
+          });
+        }
+      }
+      
+      // Dynamically import the deeplearning module
+      const { detectHyperparametersWithAI } = await import('./deeplearning');
+      
+      // Use deep learning to detect hyperparameters
+      const result = await detectHyperparametersWithAI(code);
+      
+      return res.json(result);
+    } catch (error) {
+      console.error("Error detecting hyperparameters:", error);
+      return res.status(500).json({
+        success: false,
+        parameters: [],
+        error: `Server error: ${error instanceof Error ? error.message : String(error)}`
+      });
+    }
+  });
+  
+  // Route for getting alternative hyperparameter suggestions
+  app.post("/api/llm/alternative-hyperparameters", async (req: Request, res: Response) => {
+    try {
+      const { paramName, paramValue, framework } = req.body;
+      
+      if (!paramName || !paramValue) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Missing required parameters"
+        });
+      }
+      
+      // Check if Vertex AI is initialized
+      if (!vertexai) {
+        const initialized = initializeVertexAI();
+        if (!initialized) {
+          return res.status(503).json({
+            success: false,
+            error: "LLM service not available. Please provide Google Cloud credentials."
+          });
+        }
+      }
+      
+      // Dynamically import the deeplearning module
+      const { getAlternativeHyperparameters } = await import('./deeplearning');
+      
+      // Get alternative suggestions
+      const result = await getAlternativeHyperparameters(paramName, paramValue, framework || 'generic');
+      
+      return res.json(result);
+    } catch (error) {
+      console.error("Error getting alternative hyperparameters:", error);
+      return res.status(500).json({
+        success: false,
+        alternatives: [],
+        error: `Server error: ${error instanceof Error ? error.message : String(error)}`
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -1,1013 +1,596 @@
-// Content script for HyperExplainer extension
+// Global settings
+const EXTENSION_ID = chrome.runtime.id;
+const API_ENDPOINT = 'https://hyperexplainer.replit.app';
+let sidebarVisible = false;
+let detectedParameters = [];
+let currentFrameworks = [];
 
-// Global state to track if the analysis has been activated
-let isAnalysisActive = false;
-let hyperparameterSidebar = null;
-let highlightedParameters = [];
-let currentCodeBlock = null; // Store reference to current code block
-let currentCode = ""; // Store the current code being analyzed
+// Initialize when DOM is fully loaded
+document.addEventListener('DOMContentLoaded', () => {
+  // Wait a bit for dynamic content to load
+  setTimeout(() => {
+    processCodeBlocks();
+    
+    // Add mutation observer to detect new code blocks
+    const observer = new MutationObserver((mutations) => {
+      let shouldProcess = false;
+      
+      mutations.forEach((mutation) => {
+        if (mutation.addedNodes.length > 0) {
+          shouldProcess = true;
+        }
+      });
+      
+      if (shouldProcess) {
+        setTimeout(processCodeBlocks, 1000);
+      }
+    });
+    
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }, 1500);
+});
 
-// Detect the ML framework used in the code
-function detectFramework(code) {
-  // Check for common framework imports and patterns
-  const frameworkPatterns = {
-    'PyTorch': [
-      /import\s+torch/, 
-      /from\s+torch/, 
-      /nn\.Module/, 
-      /torch\./
-    ],
-    'TensorFlow': [
-      /import\s+tensorflow/, 
-      /from\s+tensorflow/, 
-      /import\s+tf/, 
-      /tf\./
-    ],
-    'Keras': [
-      /import\s+keras/, 
-      /from\s+keras/, 
-      /keras\./,
-      /\.add\(Dense/,
-      /Sequential\(\)/
-    ],
-    'Scikit-learn': [
-      /import\s+sklearn/, 
-      /from\s+sklearn/, 
-      /DecisionTreeClassifier/, 
-      /RandomForestClassifier/,
-      /LogisticRegression/
-    ],
-    'XGBoost': [
-      /import\s+xgboost/, 
-      /from\s+xgboost/, 
-      /XGBClassifier/, 
-      /XGBRegressor/
-    ],
-    'JAX': [
-      /import\s+jax/, 
-      /from\s+jax/, 
-      /jnp\./, 
-      /jax\./
-    ],
-    'Hugging Face': [
-      /from\s+transformers/, 
-      /import\s+transformers/, 
-      /AutoTokenizer/, 
-      /AutoModel/,
-      /pipeline\(/
-    ]
-  };
+// Process all code blocks on the page
+function processCodeBlocks() {
+  // Look for code blocks in various formats (pre, code elements, etc.)
+  const codeElements = document.querySelectorAll('pre code, pre, .code-block, .hljs');
   
-  // Check each framework's patterns
-  for (const [framework, patterns] of Object.entries(frameworkPatterns)) {
-    for (const pattern of patterns) {
-      if (pattern.test(code)) {
-        return framework;
+  if (codeElements.length === 0) return;
+  
+  detectedParameters = [];
+  currentFrameworks = [];
+  
+  codeElements.forEach((codeBlock) => {
+    if (codeBlock.dataset.hyperprocessed) return;
+    
+    analyzeCodeBlock(codeBlock);
+    codeBlock.dataset.hyperprocessed = 'true';
+  });
+  
+  if (detectedParameters.length > 0 && !sidebarVisible) {
+    createSidebar();
+    toggleSidebar(true);
+  }
+}
+
+// Analyze a single code block for hyperparameters
+function analyzeCodeBlock(codeBlock) {
+  const code = codeBlock.textContent || codeBlock.innerText;
+  if (!code) return;
+  
+  // Detect the framework first
+  const frameworks = detectFrameworks(code);
+  if (frameworks.length > 0) {
+    frameworks.forEach(framework => {
+      if (!currentFrameworks.includes(framework)) {
+        currentFrameworks.push(framework);
+      }
+    });
+  }
+  
+  // Define regex patterns for different hyperparameters
+  const hyperparameterPatterns = [
+    // Learning rate patterns
+    { 
+      pattern: /learning_rate\s*=\s*([\d.]+)/g, 
+      paramName: 'learning_rate',
+      framework: 'tensorflow'
+    },
+    { 
+      pattern: /lr\s*=\s*([\d.]+)/g,
+      paramName: 'lr',
+      framework: 'pytorch'
+    },
+    
+    // Batch size patterns
+    { 
+      pattern: /batch_size\s*=\s*(\d+)/g,
+      paramName: 'batch_size',
+      framework: 'common'
+    },
+    
+    // Dropout patterns
+    { 
+      pattern: /dropout\s*=\s*([\d.]+)/g,
+      paramName: 'dropout',
+      framework: 'common'
+    },
+    { 
+      pattern: /Dropout\s*\(\s*([\d.]+)\s*\)/g,
+      paramName: 'dropout',
+      framework: 'common'
+    },
+    
+    // Epochs patterns
+    { 
+      pattern: /epochs\s*=\s*(\d+)/g,
+      paramName: 'epochs',
+      framework: 'common'
+    },
+    
+    // Weight decay/regularization patterns
+    { 
+      pattern: /weight_decay\s*=\s*([\d.]+)/g,
+      paramName: 'weight_decay',
+      framework: 'pytorch'
+    },
+    
+    // Optimizer patterns
+    { 
+      pattern: /optimizer\s*=\s*['"]?(\w+)['"]?/g,
+      paramName: 'optimizer',
+      framework: 'common'
+    },
+    { 
+      pattern: /Optimizer\.\w+\s*\(/g,
+      paramName: 'optimizer',
+      framework: 'tensorflow'
+    },
+    
+    // Activation function patterns
+    { 
+      pattern: /activation\s*=\s*['"](\w+)['"]/g,
+      paramName: 'activation',
+      framework: 'common'
+    },
+    
+    // Momentum patterns
+    { 
+      pattern: /momentum\s*=\s*([\d.]+)/g,
+      paramName: 'momentum',
+      framework: 'common'
+    },
+    
+    // Hidden layers/units patterns
+    { 
+      pattern: /units\s*=\s*(\d+)/g,
+      paramName: 'units',
+      framework: 'tensorflow'
+    },
+    { 
+      pattern: /hidden_size\s*=\s*(\d+)/g,
+      paramName: 'hidden_size',
+      framework: 'pytorch'
+    }
+  ];
+  
+  // Process the code with each pattern
+  hyperparameterPatterns.forEach(({ pattern, paramName, framework }) => {
+    let match;
+    while ((match = pattern.exec(code)) !== null) {
+      const paramValue = match[1];
+      const matchedText = match[0];
+      
+      // Find the actual location in the DOM
+      const textNode = findTextNodeContaining(codeBlock, matchedText);
+      if (!textNode) return;
+      
+      // Create a unique ID for this parameter
+      const paramId = `hyperparam-${paramName}-${Math.floor(Math.random() * 10000)}`;
+      
+      // Split the text node to insert our highlighted element
+      const range = document.createRange();
+      range.setStart(textNode.node, textNode.start + match.index);
+      range.setEnd(textNode.node, textNode.start + match.index + matchedText.length);
+      
+      // Create the highlight span
+      const span = document.createElement('span');
+      span.id = paramId;
+      span.className = 'hyperexplainer-highlight';
+      span.setAttribute('data-param-name', paramName);
+      span.setAttribute('data-param-value', paramValue);
+      span.setAttribute('data-framework', framework);
+      span.innerHTML = matchedText;
+      span.style.backgroundColor = 'rgba(255, 212, 0, 0.3)';
+      span.style.padding = '2px';
+      span.style.borderRadius = '3px';
+      span.style.cursor = 'pointer';
+      span.style.position = 'relative';
+      
+      // Replace the text with our span
+      range.deleteContents();
+      range.insertNode(span);
+      
+      // Add click handler to show details
+      span.addEventListener('click', () => {
+        showParameterDetails(paramName, paramValue, framework, code);
+      });
+      
+      // Add to our list of detected parameters
+      const existingParam = detectedParameters.find(p => 
+        p.paramName === paramName && p.paramValue === paramValue
+      );
+      
+      if (!existingParam) {
+        detectedParameters.push({
+          id: paramId,
+          paramName,
+          paramValue,
+          framework,
+          element: span,
+          codeContext: code
+        });
+      }
+    }
+  });
+  
+  // If we found parameters, add a floating icon to access the sidebar
+  if (detectedParameters.length > 0 && !document.querySelector('.hyperexplainer-fab')) {
+    const fab = document.createElement('div');
+    fab.className = 'hyperexplainer-fab';
+    fab.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"></path>
+        <line x1="16" y1="8" x2="2" y2="22"></line>
+        <line x1="17.5" y1="15" x2="9" y2="15"></line>
+      </svg>
+    `;
+    fab.style.position = 'fixed';
+    fab.style.right = '20px';
+    fab.style.bottom = '20px';
+    fab.style.width = '48px';
+    fab.style.height = '48px';
+    fab.style.borderRadius = '50%';
+    fab.style.backgroundColor = '#4F46E5';
+    fab.style.color = 'white';
+    fab.style.display = 'flex';
+    fab.style.alignItems = 'center';
+    fab.style.justifyContent = 'center';
+    fab.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+    fab.style.cursor = 'pointer';
+    fab.style.zIndex = '10000';
+    
+    fab.addEventListener('click', () => {
+      toggleSidebar(!sidebarVisible);
+    });
+    
+    document.body.appendChild(fab);
+  }
+}
+
+// Helper function to find text node containing a specific string
+function findTextNodeContaining(element, text) {
+  const textNodes = [];
+  
+  function getTextNodes(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      textNodes.push({
+        node,
+        text: node.textContent,
+        start: 0
+      });
+    } else {
+      for (let i = 0; i < node.childNodes.length; i++) {
+        getTextNodes(node.childNodes[i]);
       }
     }
   }
   
-  // Default if no specific framework is detected
-  return "Machine Learning";
+  getTextNodes(element);
+  
+  for (const textNode of textNodes) {
+    const index = textNode.text.indexOf(text);
+    if (index !== -1) {
+      return {
+        node: textNode.node,
+        start: index
+      };
+    }
+  }
+  
+  return null;
 }
 
-// Create and inject the HyperExplainer sidebar into the page
+// Create the sidebar to display all detected hyperparameters
 function createSidebar() {
-  if (hyperparameterSidebar) {
-    return hyperparameterSidebar;
+  // Remove existing sidebar if any
+  const existingSidebar = document.getElementById('hyperexplainer-sidebar');
+  if (existingSidebar) {
+    existingSidebar.remove();
   }
-
-  // Create the sidebar container
-  hyperparameterSidebar = document.createElement('div');
-  hyperparameterSidebar.id = 'hyperexplainer-sidebar';
-  hyperparameterSidebar.style.cssText = `
-    position: fixed;
-    top: 0;
-    right: 0;
-    width: 350px;
-    height: 100vh;
-    background-color: white;
-    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
-    z-index: 10000;
-    display: flex;
-    flex-direction: column;
-    font-family: 'Inter', sans-serif;
-    transition: transform 0.3s ease;
-    transform: translateX(100%);
-  `;
-
-  // Create the header
-  const header = document.createElement('div');
-  header.style.cssText = `
-    padding: 16px;
-    border-bottom: 1px solid #e2e8f0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  
+  // Create new sidebar
+  const sidebar = document.createElement('div');
+  sidebar.id = 'hyperexplainer-sidebar';
+  sidebar.style.position = 'fixed';
+  sidebar.style.top = '0';
+  sidebar.style.right = '-350px';
+  sidebar.style.width = '350px';
+  sidebar.style.height = '100vh';
+  sidebar.style.backgroundColor = 'white';
+  sidebar.style.boxShadow = '-2px 0 8px rgba(0, 0, 0, 0.15)';
+  sidebar.style.transition = 'right 0.3s ease-in-out';
+  sidebar.style.zIndex = '10001';
+  sidebar.style.overflow = 'auto';
+  sidebar.style.padding = '20px';
+  sidebar.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+  
+  // Add header
+  sidebar.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h2 style="margin: 0; color: #4F46E5; font-size: 18px;">HyperExplainer</h2>
+      <button id="hyperexplainer-close" style="background: none; border: none; cursor: pointer; font-size: 20px;">×</button>
+    </div>
+    <p style="margin-bottom: 15px; font-size: 14px; color: #666;">
+      Detected ${detectedParameters.length} hyperparameters in the code.
+      Click on each to learn more.
+    </p>
+    <div id="hyperexplainer-parameters-list"></div>
   `;
   
-  const title = document.createElement('h2');
-  title.textContent = 'HyperExplainer';
-  title.style.cssText = `
-    font-size: 18px;
-    font-weight: 600;
-    color: #1e293b;
-    display: flex;
-    align-items: center;
-  `;
+  document.body.appendChild(sidebar);
   
-  // Add an eye icon to the title
-  title.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="#6366f1" style="width: 20px; height: 20px; margin-right: 8px;">
-      <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-      <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
-    </svg>
-    HyperExplainer
-  `;
+  // Add parameters to list
+  const parametersList = document.getElementById('hyperexplainer-parameters-list');
   
-  const closeButton = document.createElement('button');
-  closeButton.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px;">
-      <line x1="18" y1="6" x2="6" y2="18"></line>
-      <line x1="6" y1="6" x2="18" y2="18"></line>
-    </svg>
-  `;
-  closeButton.style.cssText = `
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: #64748b;
-  `;
-  closeButton.addEventListener('click', () => {
+  detectedParameters.forEach((param) => {
+    const paramItem = document.createElement('div');
+    paramItem.className = 'hyperexplainer-param-item';
+    paramItem.style.padding = '12px';
+    paramItem.style.marginBottom = '10px';
+    paramItem.style.border = '1px solid #eee';
+    paramItem.style.borderRadius = '6px';
+    paramItem.style.cursor = 'pointer';
+    paramItem.style.transition = 'background-color 0.2s';
+    
+    // Determine importance indicator
+    let importance = 'medium';
+    if (['learning_rate', 'lr', 'batch_size', 'optimizer'].includes(param.paramName)) {
+      importance = 'high';
+    } else if (['weight_decay', 'momentum'].includes(param.paramName)) {
+      importance = 'medium';
+    }
+    
+    const importanceColor = {
+      high: '#ef4444',
+      medium: '#f59e0b',
+      low: '#10b981'
+    };
+    
+    paramItem.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #333;">
+            ${param.paramName}
+            <span style="font-weight: normal; color: #666;">=</span>
+            <span style="color: #4F46E5;">${param.paramValue}</span>
+          </div>
+          <div style="font-size: 13px; color: #666; margin-top: 3px;">
+            Framework: ${param.framework}
+          </div>
+        </div>
+        <div style="display: flex; align-items: center;">
+          <span style="
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: ${importanceColor[importance]};
+            margin-right: 6px;
+          "></span>
+          <span style="font-size: 12px; color: #666; text-transform: capitalize;">${importance} impact</span>
+        </div>
+      </div>
+      <div style="font-size: 13px; margin-top: 8px; display: flex; justify-content: flex-end;">
+        <button class="hyperexplainer-learn-more" style="
+          background: none;
+          border: none;
+          color: #4F46E5;
+          font-size: 13px;
+          cursor: pointer;
+          text-decoration: underline;
+          padding: 0;
+        ">Learn more</button>
+      </div>
+    `;
+    
+    paramItem.addEventListener('mouseover', () => {
+      paramItem.style.backgroundColor = '#f9fafb';
+    });
+    
+    paramItem.addEventListener('mouseout', () => {
+      paramItem.style.backgroundColor = 'white';
+    });
+    
+    paramItem.querySelector('.hyperexplainer-learn-more').addEventListener('click', (e) => {
+      e.stopPropagation();
+      // Open details page in new tab
+      window.open(`${API_ENDPOINT}/?param=${param.paramName}&value=${param.paramValue}&framework=${param.framework}`, '_blank');
+    });
+    
+    paramItem.addEventListener('click', () => {
+      showParameterDetails(param.paramName, param.paramValue, param.framework, param.codeContext);
+    });
+    
+    parametersList.appendChild(paramItem);
+  });
+  
+  // Add close button event
+  document.getElementById('hyperexplainer-close').addEventListener('click', () => {
     toggleSidebar(false);
   });
   
-  header.appendChild(title);
-  header.appendChild(closeButton);
-  
-  // Create the content area
-  const content = document.createElement('div');
-  content.id = 'parameter-details';
-  content.style.cssText = `
-    padding: 16px;
-    flex: 1;
-    overflow-y: auto;
-  `;
-  
-  // Default state with no selection
-  content.innerHTML = `
-    <div class="text-sm text-gray-500 mb-3" style="font-size: 14px; color: #64748b; margin-bottom: 12px;">
-      Click on a highlighted parameter to see details
-    </div>
-    <div id="no-selection" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 0; text-align: center;">
-      <div style="width: 64px; height: 64px; border-radius: 50%; background-color: #f1f5f9; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="#94a3b8" style="width: 32px; height: 32px;">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </div>
-      <p style="color: #475569; font-weight: 500; font-size: 16px;">No parameter selected</p>
-      <p style="color: #64748b; font-size: 14px; margin-top: 4px;">Select a highlighted parameter in the code to view its details</p>
-    </div>
-    <div id="parameter-card" style="display: none;"></div>
-  `;
-  
-  // Create the footer
-  const footer = document.createElement('div');
-  footer.style.cssText = `
-    border-top: 1px solid #e2e8f0;
-    padding: 16px;
-  `;
-  
-  const generateButton = document.createElement('button');
-  generateButton.textContent = 'Generate Alternative Code';
-  generateButton.style.cssText = `
-    width: 100%;
-    background-color: #6366f1;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 8px 16px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  `;
-  generateButton.addEventListener('mouseover', () => {
-    generateButton.style.backgroundColor = '#4f46e5';
-  });
-  generateButton.addEventListener('mouseout', () => {
-    generateButton.style.backgroundColor = '#6366f1';
-  });
-  
-  // Add click handler for generating alternative code
-  generateButton.addEventListener('click', () => {
-    if (!currentCode || !highlightedParameters.length) {
-      showNotification('Please analyze a code block first');
-      return;
-    }
-    
-    // Get framework from the code
-    const framework = detectFramework(currentCode);
-    
-    // Generate optimized code with advanced alternatives
-    let optimizedCode = currentCode;
-    
-    // Convert the highlightedParameters to include positions
-    const paramsWithPositions = highlightedParameters.map(param => {
-      const pos = currentCode.indexOf(param.value);
-      return {
-        key: param.key,
-        value: param.value,
-        position: { 
-          start: pos, 
-          end: pos + param.value.length 
-        }
-      };
-    });
-    
-    // Sort params in reverse order by position to avoid messing up indices
-    const sortedParams = [...paramsWithPositions].sort(
-      (a, b) => b.position.start - a.position.start
-    );
-    
-    for (const param of sortedParams) {
-      const paramInfo = paramInfoMap[param.key];
-      if (!paramInfo || !paramInfo.alternatives.length) continue;
-      
-      // Choose the most "advanced" alternative
-      const advancedAlt = paramInfo.alternatives.find(alt => alt.type === "advanced");
-      if (advancedAlt) {
-        // Original parameter text (from position.start to position.end)
-        const paramText = currentCode.substring(param.position.start, param.position.end);
-        
-        // Create the replacement text
-        const newParamText = paramText.replace(param.value, advancedAlt.value);
-        
-        // Replace in the optimized code
-        optimizedCode = optimizedCode.substring(0, param.position.start) + 
-                       newParamText + 
-                       optimizedCode.substring(param.position.end);
-      }
-    }
-    
-    // Create a new dialogue to show the alternative code
-    const dialog = document.createElement('div');
-    dialog.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(0, 0, 0, 0.5);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 10002;
-      font-family: 'Inter', sans-serif;
-    `;
-    
-    dialog.innerHTML = `
-      <div style="background-color: white; width: 800px; max-width: 90%; max-height: 90vh; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
-        <div style="background-color: #6366f1; padding: 16px; display: flex; justify-content: space-between; align-items: center; color: white;">
-          <h3 style="margin: 0; font-weight: 600; font-size: 18px;">Alternative Code with Optimized Hyperparameters</h3>
-          <button id="close-dialog" style="background: none; border: none; color: white; cursor: pointer;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
-        <div style="padding: 16px; max-height: calc(90vh - 120px); overflow-y: auto;">
-          <div style="background-color: #f8fafc; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-            <p style="margin-top: 0; color: #334155; font-size: 14px;">
-              This code has been optimized with advanced hyperparameter configurations for ${framework}. 
-              The optimized version focuses on achieving better model performance.
-            </p>
-          </div>
-          <pre style="background-color: #f1f5f9; border-radius: 8px; padding: 16px; overflow-x: auto; font-family: 'JetBrains Mono', monospace; font-size: 14px; line-height: 1.5; margin: 0;">${optimizedCode}</pre>
-        </div>
-        <div style="border-top: 1px solid #e2e8f0; padding: 16px; display: flex; justify-content: flex-end;">
-          <button id="copy-code" style="background-color: #6366f1; color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 14px; font-weight: 500; cursor: pointer;">
-            Copy Code
-          </button>
-        </div>
-      </div>
-    `;
-    
-    document.body.appendChild(dialog);
-    
-    // Add event listeners to dialog buttons
-    dialog.querySelector('#close-dialog').addEventListener('click', () => {
-      dialog.remove();
-    });
-    
-    dialog.querySelector('#copy-code').addEventListener('click', () => {
-      navigator.clipboard.writeText(optimizedCode).then(() => {
-        showNotification('Code copied to clipboard!');
-      });
-    });
-    
-    // Close when clicking outside the dialog content
-    dialog.addEventListener('click', (e) => {
-      if (e.target === dialog) {
-        dialog.remove();
-      }
-    });
-  });
-  
-  const exportButton = document.createElement('button');
-  exportButton.textContent = 'Export Parameter Documentation';
-  exportButton.style.cssText = `
-    width: 100%;
-    background-color: white;
-    color: #475569;
-    border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    padding: 8px 16px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    margin-top: 8px;
-    transition: background-color 0.2s;
-  `;
-  exportButton.addEventListener('mouseover', () => {
-    exportButton.style.backgroundColor = '#f8fafc';
-  });
-  exportButton.addEventListener('mouseout', () => {
-    exportButton.style.backgroundColor = 'white';
-  });
-  
-  // Add click handler for exporting parameter documentation
-  exportButton.addEventListener('click', () => {
-    if (!currentCode || !highlightedParameters.length) {
-      showNotification('Please analyze a code block first');
-      return;
-    }
-    
-    // Generate parameter documentation in markdown format
-    const framework = detectFramework(currentCode);
-    
-    // Convert the highlightedParameters to simpler format for docs
-    const paramsForDocs = highlightedParameters.map(param => {
-      return {
-        key: param.key,
-        value: param.value
-      };
-    });
-    
-    // Create markdown documentation
-    let mdDoc = `# Hyperparameter Documentation\n\n`;
-    
-    // Add framework information
-    mdDoc += `## Framework Information\n\n`;
-    mdDoc += `Primary Framework: ${framework}\n\n`;
-    
-    // Add hyperparameter details
-    mdDoc += `## Hyperparameters\n\n`;
-    
-    paramsForDocs.forEach(param => {
-      const paramInfo = paramInfoMap[param.key];
-      if (!paramInfo) return;
-      
-      mdDoc += `### ${paramInfo.name}\n\n`;
-      mdDoc += `**Current Value:** \`${param.value}\`\n\n`;
-      mdDoc += `**Description:** ${paramInfo.description}\n\n`;
-      mdDoc += `**Impact:** ${paramInfo.impact.charAt(0).toUpperCase() + paramInfo.impact.slice(1)}\n\n`;
-      
-      if (paramInfo.alternatives.length > 0) {
-        mdDoc += `**Alternatives:**\n\n`;
-        paramInfo.alternatives.forEach(alt => {
-          mdDoc += `- **${alt.value}**: ${alt.description}\n`;
-        });
-        mdDoc += `\n`;
-      }
-    });
-    
-    // Add references section
-    mdDoc += `## References\n\n`;
-    mdDoc += `- [${framework} Documentation](https://example.com/${framework.toLowerCase()})\n`;
-    mdDoc += `- [Hyperparameter Optimization Guide](https://example.com/hyperparameter-optimization)\n\n`;
-    mdDoc += `Generated by HyperExplainer Chrome Extension - ${new Date().toLocaleDateString()}\n`;
-    
-    // Create a dialog to show the documentation with export options
-    const dialog = document.createElement('div');
-    dialog.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(0, 0, 0, 0.5);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 10002;
-      font-family: 'Inter', sans-serif;
-    `;
-    
-    dialog.innerHTML = `
-      <div style="background-color: white; width: 800px; max-width: 90%; max-height: 90vh; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
-        <div style="background-color: #6366f1; padding: 16px; display: flex; justify-content: space-between; align-items: center; color: white;">
-          <h3 style="margin: 0; font-weight: 600; font-size: 18px;">Hyperparameter Documentation</h3>
-          <button id="close-dialog" style="background: none; border: none; color: white; cursor: pointer;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
-        <div style="padding: 16px; max-height: calc(90vh - 120px); overflow-y: auto;">
-          <div style="background-color: #f8fafc; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-            <p style="margin-top: 0; color: #334155; font-size: 14px;">
-              This documentation explains the hyperparameters found in your ${framework} code,
-              including their impact and alternative configurations.
-            </p>
-          </div>
-          <pre style="background-color: #f1f5f9; border-radius: 8px; padding: 16px; overflow-x: auto; font-family: 'JetBrains Mono', monospace; font-size: 14px; line-height: 1.5; margin: 0; white-space: pre-wrap;">${mdDoc}</pre>
-        </div>
-        <div style="border-top: 1px solid #e2e8f0; padding: 16px; display: flex; justify-content: flex-end; gap: 8px;">
-          <button id="copy-md" style="background-color: white; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 16px; font-size: 14px; font-weight: 500; cursor: pointer;">
-            Copy Markdown
-          </button>
-          <button id="download-md" style="background-color: #6366f1; color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 14px; font-weight: 500; cursor: pointer;">
-            Download as MD
-          </button>
-        </div>
-      </div>
-    `;
-    
-    document.body.appendChild(dialog);
-    
-    // Add event listeners to dialog buttons
-    dialog.querySelector('#close-dialog').addEventListener('click', () => {
-      dialog.remove();
-    });
-    
-    dialog.querySelector('#copy-md').addEventListener('click', () => {
-      navigator.clipboard.writeText(mdDoc).then(() => {
-        showNotification('Documentation copied to clipboard!');
-      });
-    });
-    
-    dialog.querySelector('#download-md').addEventListener('click', () => {
-      // Create a blob and download it
-      const blob = new Blob([mdDoc], { type: 'text/markdown' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `hyperparameters-${framework.toLowerCase()}-${new Date().toISOString().split('T')[0]}.md`;
-      a.click();
-      URL.revokeObjectURL(url);
-      showNotification('Documentation downloaded!');
-    });
-    
-    // Close when clicking outside the dialog content
-    dialog.addEventListener('click', (e) => {
-      if (e.target === dialog) {
-        dialog.remove();
-      }
-    });
-  });
-  
-  footer.appendChild(generateButton);
-  footer.appendChild(exportButton);
-  
-  // Assemble the sidebar
-  hyperparameterSidebar.appendChild(header);
-  hyperparameterSidebar.appendChild(content);
-  hyperparameterSidebar.appendChild(footer);
-  
-  document.body.appendChild(hyperparameterSidebar);
-  
-  return hyperparameterSidebar;
+  return sidebar;
 }
 
-// Toggle the sidebar visibility
+// Toggle sidebar visibility
 function toggleSidebar(show) {
-  if (!hyperparameterSidebar) {
-    hyperparameterSidebar = createSidebar();
-  }
+  const sidebar = document.getElementById('hyperexplainer-sidebar');
+  if (!sidebar) return;
   
-  hyperparameterSidebar.style.transform = show ? 'translateX(0)' : 'translateX(100%)';
+  if (show) {
+    sidebar.style.right = '0';
+    sidebarVisible = true;
+  } else {
+    sidebar.style.right = '-350px';
+    sidebarVisible = false;
+  }
 }
 
-// Add hyperparameter highlighting to code blocks
-function processCodeBlocks() {
-  // Only process if analysis is active
-  if (!isAnalysisActive) {
-    return;
+// Show compact parameter details popup
+function showParameterDetails(paramKey, paramValue, framework, codeContext) {
+  // Remove any existing popup
+  const existingPopup = document.getElementById('hyperexplainer-popup');
+  if (existingPopup) {
+    existingPopup.remove();
   }
   
-  // Find all code blocks in ChatGPT responses
-  const codeBlocks = document.querySelectorAll('pre');
+  // Create new popup with minimal content
+  const popup = document.createElement('div');
+  popup.id = 'hyperexplainer-popup';
+  popup.style.position = 'fixed';
+  popup.style.top = '50%';
+  popup.style.left = '50%';
+  popup.style.transform = 'translate(-50%, -50%)';
+  popup.style.width = '350px';
+  popup.style.backgroundColor = 'white';
+  popup.style.borderRadius = '8px';
+  popup.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.15)';
+  popup.style.zIndex = '10002';
+  popup.style.padding = '20px';
+  popup.style.fontFamily = 'system-ui, -apple-system, sans-serif';
   
-  codeBlocks.forEach(block => {
-    // Skip if already processed
-    if (block.dataset.processed === 'true') {
-      return;
-    }
-    
-    // Add the processed flag
-    block.dataset.processed = 'true';
-    
-    // Add analyze button if not already present
-    if (!block.querySelector('.analyze-button')) {
-      const analyzeButton = document.createElement('button');
-      analyzeButton.className = 'analyze-button';
-      analyzeButton.textContent = 'Analyze';
-      analyzeButton.style.cssText = `
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        background-color: #6366f1;
+  // Add popup content
+  popup.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <h3 style="margin: 0; color: #4F46E5; font-size: 18px;">${paramKey}</h3>
+      <button id="hyperexplainer-popup-close" style="background: none; border: none; cursor: pointer; font-size: 20px;">×</button>
+    </div>
+    <div style="margin-bottom: 15px;">
+      <div style="font-size: 15px; margin-bottom: 10px;">
+        <strong>Current value:</strong> <span style="color: #4F46E5; font-weight: 500;">${paramValue}</span>
+      </div>
+      <div style="font-size: 14px; color: #666; margin-bottom: 5px;">
+        <strong>Impact:</strong> This parameter has a <span style="color: #ef4444; font-weight: 500;">high impact</span> on model performance.
+      </div>
+      <div style="font-size: 14px; color: #666; margin-bottom: 15px;">
+        <strong>Usage in:</strong> ${framework}
+      </div>
+    </div>
+    <div style="display: flex; justify-content: center;">
+      <button id="hyperexplainer-learn-more-btn" style="
+        background-color: #4F46E5;
         color: white;
         border: none;
-        border-radius: 4px;
-        padding: 4px 8px;
-        font-size: 12px;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 14px;
         cursor: pointer;
-        z-index: 10;
-      `;
-      
-      // Make the code block container relative for absolute positioning
-      block.style.position = 'relative';
-      
-      // Add click handler for analyze button
-      analyzeButton.addEventListener('click', () => {
-        analyzeCodeBlock(block);
-        toggleSidebar(true);
-      });
-      
-      block.appendChild(analyzeButton);
-    }
-  });
-}
-
-// Analyze a code block for hyperparameters
-function analyzeCodeBlock(codeBlock) {
-  // Store current code block and code text
-  currentCodeBlock = codeBlock;
-  currentCode = codeBlock.textContent;
-  
-  // Clear previously highlighted parameters
-  highlightedParameters = [];
-  
-  // Basic patterns to identify common hyperparameters
-  const patterns = [
-    // Learning rates
-    { regex: /lr\s*=\s*([\d.]+)/g, key: "learning_rate" },
-    { regex: /learning_rate\s*=\s*([\d.]+)/g, key: "learning_rate" },
-    { regex: /LearningRateScheduler\([\s\S]*?([\d.]+)/g, key: "learning_rate" },
-    
-    // Batch sizes
-    { regex: /batch_size\s*=\s*(\d+)/g, key: "batch_size" },
-    { regex: /batchSize\s*=\s*(\d+)/g, key: "batch_size" },
-    { regex: /batch_size:\s*(\d+)/g, key: "batch_size" },
-    
-    // Dropout
-    { regex: /dropout\s*\(\s*([\d.]+)\s*\)/g, key: "dropout_rate" },
-    { regex: /dropout\s*=\s*([\d.]+)/g, key: "dropout_rate" },
-    { regex: /Dropout\(([\d.]+)\)/g, key: "dropout_rate" },
-    
-    // Epochs
-    { regex: /epochs\s*=\s*(\d+)/g, key: "num_epochs" },
-    { regex: /num_epochs\s*=\s*(\d+)/g, key: "num_epochs" },
-    { regex: /n_epochs\s*=\s*(\d+)/g, key: "num_epochs" },
-    
-    // Weight decay
-    { regex: /weight_decay\s*=\s*([\d.]+)/g, key: "weight_decay" },
-    { regex: /decay\s*=\s*([\d.]+)/g, key: "weight_decay" },
-    
-    // Optimizers
-    { regex: /optimizer\s*=\s*['"]?(\w+)['"]?/g, key: "optimizer" },
-    
-    // Other hyperparameters
-    { regex: /n_estimators\s*=\s*(\d+)/g, key: "n_estimators" },
-    { regex: /max_depth\s*=\s*(\d+|None)/g, key: "max_depth" },
-    { regex: /hidden_size\s*=\s*(\d+)/g, key: "hidden_size" },
-    { regex: /hidden_dim\s*=\s*(\d+)/g, key: "hidden_size" },
-    { regex: /embedding_dim\s*=\s*(\d+)/g, key: "embedding_dim" }
-  ];
-  
-  // Tokenize the code and replace with highlighted spans
-  let tokenizedCode = currentCode;
-  let offset = 0;
-  
-  patterns.forEach(pattern => {
-    let match;
-    while ((match = pattern.regex.exec(currentCode)) !== null) {
-      const fullMatch = match[0];
-      const paramValue = match[1];
-      const startPos = match.index + currentCode.substring(match.index).indexOf(paramValue);
-      const endPos = startPos + paramValue.length;
-      
-      // Create an object to track this parameter
-      const param = {
-        key: pattern.key,
-        value: paramValue,
-        element: null
-      };
-      
-      highlightedParameters.push(param);
-    }
-  });
-  
-  // Create highlighted spans for the parameters
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = currentCode;
-  
-  // Sort parameters by their position in reverse order to avoid messing up indices
-  highlightedParameters.sort((a, b) => {
-    const aIndex = currentCode.indexOf(a.value);
-    const bIndex = currentCode.indexOf(b.value);
-    return bIndex - aIndex;
-  });
-  
-  highlightedParameters.forEach(param => {
-    // Find the text to replace
-    const pos = currentCode.indexOf(param.value);
-    if (pos !== -1) {
-      const beforeText = tokenizedCode.substring(0, pos);
-      const afterText = tokenizedCode.substring(pos + param.value.length);
-      
-      // Create the highlighted span
-      tokenizedCode = beforeText + 
-        `<span class="param-highlight" data-param="${param.key}" data-value="${param.value}" style="background-color: #fef08a; border-radius: 4px; padding: 0 4px; cursor: pointer;">` + 
-        param.value + 
-        '</span>' + 
-        afterText;
-    }
-  });
-  
-  // Update the code block with highlighted parameters
-  codeBlock.innerHTML = tokenizedCode;
-  
-  // Add click handlers to the highlighted parameters
-  const paramHighlights = codeBlock.querySelectorAll('.param-highlight');
-  paramHighlights.forEach(highlight => {
-    highlight.addEventListener('click', () => {
-      const paramKey = highlight.dataset.param;
-      const paramValue = highlight.dataset.value;
-      showParameterDetails(paramKey, paramValue);
-    });
-  });
-  
-  // Show notification
-  showNotification(`${highlightedParameters.length} hyperparameters identified!`);
-}
-
-// Show parameter details in the sidebar
-function showParameterDetails(paramKey, paramValue) {
-  if (!hyperparameterSidebar) {
-    hyperparameterSidebar = createSidebar();
-  }
-  
-  // Get the parameter card element
-  const parameterCard = hyperparameterSidebar.querySelector('#parameter-card');
-  const noSelection = hyperparameterSidebar.querySelector('#no-selection');
-  
-  // Hide the no selection message
-  noSelection.style.display = 'none';
-  
-  // Show the parameter card
-  parameterCard.style.display = 'block';
-  
-  // Hyperparameter database (simplified version for content script)
-  const paramInfoMap = {
-    learning_rate: {
-      name: "Learning Rate",
-      value: paramValue,
-      description: "Controls how much to adjust the model weights in response to the estimated error each time the model weights are updated.",
-      impact: "high",
-      framework: "PyTorch",
-      alternatives: [
-        { value: "0.01", description: "Faster learning, but may overshoot optimal solution", type: "higher" },
-        { value: "0.0001", description: "Slower learning, but more stable convergence", type: "lower" },
-        { value: "Scheduled", description: "Start high, decrease over time (e.g., ReduceLROnPlateau)", type: "advanced" }
-      ]
-    },
-    batch_size: {
-      name: "Batch Size",
-      value: paramValue,
-      description: "Number of training examples used in one iteration. Affects memory usage and training speed.",
-      impact: "medium",
-      framework: "PyTorch",
-      alternatives: [
-        { value: "64", description: "More stable gradients, but higher memory usage", type: "higher" },
-        { value: "16", description: "Less memory usage, but potentially less stable", type: "lower" },
-        { value: "Power of 2", description: "Values like 32, 64, 128 utilize GPU memory better", type: "advanced" }
-      ]
-    },
-    dropout_rate: {
-      name: "Dropout Rate",
-      value: paramValue,
-      description: "Probability of setting a neuron's output to zero during training, which helps prevent overfitting by making the network more robust.",
-      impact: "medium",
-      framework: "PyTorch",
-      alternatives: [
-        { value: "0.5", description: "More aggressive regularization, better for large networks", type: "higher" },
-        { value: "0.1", description: "Milder regularization, for smaller networks or less overfitting", type: "lower" },
-        { value: "0 (None)", description: "Disable dropout, useful for small datasets or final training", type: "extreme" }
-      ]
-    },
-    num_epochs: {
-      name: "Number of Epochs",
-      value: paramValue,
-      description: "The number of complete passes through the training dataset. Affects how long the model trains and its final performance.",
-      impact: "high",
-      framework: "PyTorch",
-      alternatives: [
-        { value: "10", description: "Longer training time, potentially better model", type: "higher" },
-        { value: "3", description: "Shorter training, useful for quick experiments", type: "lower" },
-        { value: "Early Stopping", description: "Use validation performance to determine when to stop", type: "advanced" }
-      ]
-    },
-    weight_decay: {
-      name: "Weight Decay",
-      value: paramValue,
-      description: "L2 regularization parameter that prevents the weights from growing too large, helping to reduce overfitting.",
-      impact: "medium",
-      framework: "PyTorch",
-      alternatives: [
-        { value: "0.01", description: "Stronger regularization effect", type: "higher" },
-        { value: "0.0001", description: "Weaker regularization effect", type: "lower" },
-        { value: "0", description: "No weight decay/regularization", type: "extreme" }
-      ]
-    }
-  };
-  
-  const paramInfo = paramInfoMap[paramKey] || {
-    name: paramKey.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
-    value: paramValue,
-    description: `This parameter controls the ${paramKey.replace(/_/g, ' ')} in the neural network.`,
-    impact: "medium",
-    framework: "Unknown",
-    alternatives: [
-      { value: "Higher", description: "Increase this value for stronger effect", type: "higher" },
-      { value: "Lower", description: "Decrease this value for milder effect", type: "lower" }
-    ]
-  };
-  
-  // Create the card HTML
-  const impactColor = paramInfo.impact === "high" ? "from-primary-600 to-primary-500" : 
-                     paramInfo.impact === "medium" ? "from-secondary-600 to-secondary-500" : 
-                     "from-green-600 to-green-500";
-  
-  parameterCard.innerHTML = `
-    <div class="rounded-xl border border-gray-200 overflow-hidden mb-4" style="border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 16px;">
-      <div style="background: linear-gradient(to right, ${paramInfo.impact === "high" ? "#4f46e5, #6366f1" : "#0d9488, #14b8a6"}); padding: 16px 12px; color: white;">
-        <h3 style="font-size: 18px; font-weight: 500;">${paramInfo.name}</h3>
-        <p style="font-size: 14px; opacity: 0.8;">Current Value: ${paramInfo.value}</p>
-      </div>
-      
-      <div style="padding: 16px; background: white;">
-        <div style="margin-bottom: 16px;">
-          <h4 style="font-size: 14px; font-weight: 600; color: #334155; margin-bottom: 4px;">Description</h4>
-          <p style="font-size: 14px; color: #475569;">${paramInfo.description}</p>
-        </div>
-        
-        <div style="margin-bottom: 16px;">
-          <h4 style="font-size: 14px; font-weight: 600; color: #334155; margin-bottom: 4px;">Impact</h4>
-          <div style="display: flex; align-items: center; gap: 4px;">
-            ${Array(5).fill().map((_, i) => {
-              const isActive = (paramInfo.impact === "high" && i < 3) || 
-                              (paramInfo.impact === "medium" && i < 2) ||
-                              (paramInfo.impact === "low" && i < 1);
-              const bgColor = isActive ? 
-                (paramInfo.impact === "high" ? "#ef4444" : 
-                paramInfo.impact === "medium" ? "#f59e0b" : "#22c55e") : 
-                "#e2e8f0";
-              return `<div style="height: 8px; width: 8px; border-radius: 50%; background-color: ${bgColor};"></div>`;
-            }).join('')}
-            <span style="font-size: 12px; color: #64748b; margin-left: 8px;">
-              ${paramInfo.impact === "high" ? "High Impact" : 
-                paramInfo.impact === "medium" ? "Medium Impact" : "Low Impact"}
-            </span>
-          </div>
-        </div>
-        
-        <div style="margin-bottom: 16px;">
-          <h4 style="font-size: 14px; font-weight: 600; color: #334155; margin-bottom: 8px;">Visualization</h4>
-          <div id="param-visualization-${paramKey}" style="margin-top: 8px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
-            <div class="visualization-loading" style="text-align: center; padding: 20px; color: #64748b;">
-              <p>Loading visualization...</p>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <h4 style="font-size: 14px; font-weight: 600; color: #334155; margin-bottom: 8px;">Alternatives</h4>
-          <div style="display: flex; flex-direction: column; gap: 8px;">
-            ${paramInfo.alternatives.map(alt => {
-              const isFeatured = alt.type === 'advanced' || alt.type === 'extreme';
-              const borderColor = isFeatured ? '#c7d2fe' : '#e2e8f0';
-              const bgColor = isFeatured ? '#eef2ff' : 'white';
-              const hoverBg = isFeatured ? '#e0e7ff' : '#f8fafc';
-              
-              return `
-                <div style="border-radius: 6px; border: 1px solid ${borderColor}; padding: 8px; background-color: ${bgColor}; cursor: pointer; transition: all 0.2s;"
-                     onmouseover="this.style.backgroundColor='${hoverBg}';" 
-                     onmouseout="this.style.backgroundColor='${bgColor}';">
-                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div>
-                      <span style="font-size: 14px; font-weight: 500; color: #334155;">${alt.value}</span>
-                      <p style="font-size: 12px; color: #64748b; margin-top: 4px;">${alt.description}</p>
-                    </div>
-                    <div style="background-color: ${isFeatured ? '#dbeafe' : '#f1f5f9'}; 
-                                color: ${isFeatured ? '#3b82f6' : '#475569'}; 
-                                font-size: 12px; 
-                                padding: 2px 8px; 
-                                border-radius: 4px;">
-                      ${alt.type.charAt(0).toUpperCase() + alt.type.slice(1)}
-                    </div>
-                  </div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        </div>
-      </div>
-      
-      <div style="background-color: #f8fafc; padding: 12px 16px; border-top: 1px solid #e2e8f0;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div style="font-size: 12px; color: #64748b;">
-            <span style="font-weight: 500;">Framework:</span> ${paramInfo.framework}
-          </div>
-          <button style="font-size: 12px; color: #6366f1; font-weight: 500; display: flex; align-items: center; background: none; border: none; cursor: pointer;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px; margin-right: 4px;">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-            Learn More
-          </button>
-        </div>
-      </div>
+        transition: background-color 0.2s;
+      ">See detailed analysis</button>
     </div>
   `;
   
-  // Initialize visualization after the card is added to the DOM
-  setTimeout(() => {
-    // Check if the visualization container exists
-    const vizContainer = document.getElementById(`param-visualization-${paramKey}`);
-    if (vizContainer && window.createHyperparameterVisualization) {
-      // Clear loading message
-      vizContainer.innerHTML = '';
-      
-      // Create the visualization
-      try {
-        const createVisualization = window.createHyperparameterVisualization(paramKey, paramValue);
-        createVisualization(vizContainer);
-      } catch (error) {
-        console.error('Error creating visualization:', error);
-        vizContainer.innerHTML = `
-          <div style="text-align: center; padding: 20px; color: #64748b;">
-            <p>Unable to load visualization.</p>
-          </div>
-        `;
-      }
-    }
-  }, 300); // Short delay to ensure DOM is ready and Chart.js is loaded
+  document.body.appendChild(popup);
+  
+  // Add backdrop
+  const backdrop = document.createElement('div');
+  backdrop.id = 'hyperexplainer-backdrop';
+  backdrop.style.position = 'fixed';
+  backdrop.style.top = '0';
+  backdrop.style.left = '0';
+  backdrop.style.width = '100%';
+  backdrop.style.height = '100%';
+  backdrop.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+  backdrop.style.zIndex = '10001';
+  
+  document.body.appendChild(backdrop);
+  
+  // Add event listeners
+  document.getElementById('hyperexplainer-popup-close').addEventListener('click', () => {
+    popup.remove();
+    backdrop.remove();
+  });
+  
+  document.getElementById('hyperexplainer-learn-more-btn').addEventListener('click', () => {
+    // Open details page in new tab with appropriate query parameters
+    window.open(`${API_ENDPOINT}/?param=${paramKey}&value=${paramValue}&framework=${framework}`, '_blank');
+    
+    // Close popup
+    popup.remove();
+    backdrop.remove();
+  });
+  
+  backdrop.addEventListener('click', () => {
+    popup.remove();
+    backdrop.remove();
+  });
 }
 
-// Show a notification
+// Show notification
 function showNotification(message) {
   const notification = document.createElement('div');
-  notification.style.cssText = `
-    position: fixed;
-    top: 16px;
-    right: 16px;
-    background-color: #6366f1;
-    color: white;
-    padding: 8px 16px;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    z-index: 10001;
-    font-family: 'Inter', sans-serif;
-    display: flex;
-    align-items: center;
-    animation: fadeIn 0.3s ease;
-  `;
+  notification.className = 'hyperexplainer-notification';
+  notification.style.position = 'fixed';
+  notification.style.bottom = '20px';
+  notification.style.left = '20px';
+  notification.style.padding = '12px 16px';
+  notification.style.backgroundColor = '#4F46E5';
+  notification.style.color = 'white';
+  notification.style.borderRadius = '6px';
+  notification.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+  notification.style.zIndex = '10003';
+  notification.style.transition = 'opacity 0.3s, transform 0.3s';
+  notification.style.opacity = '0';
+  notification.style.transform = 'translateY(20px)';
+  notification.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+  notification.style.fontSize = '14px';
   
-  notification.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor" style="width: 20px; height: 20px; margin-right: 8px;">
-      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-    </svg>
-    <span>${message}</span>
-  `;
+  notification.innerHTML = message;
   
   document.body.appendChild(notification);
   
-  // Remove after 3 seconds
+  // Show with animation
   setTimeout(() => {
-    notification.style.animation = 'fadeOut 0.3s ease';
-    notification.addEventListener('animationend', () => {
-      notification.remove();
-    });
-  }, 3000);
+    notification.style.opacity = '1';
+    notification.style.transform = 'translateY(0)';
+  }, 10);
   
-  // Add keyframe animations to the document if not already present
-  if (!document.querySelector('#hyperexplainer-keyframes')) {
-    const style = document.createElement('style');
-    style.id = 'hyperexplainer-keyframes';
-    style.textContent = `
-      @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-20px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      @keyframes fadeOut {
-        from { opacity: 1; transform: translateY(0); }
-        to { opacity: 0; transform: translateY(-20px); }
-      }
-    `;
-    document.head.appendChild(style);
-  }
+  // Auto-hide after 4 seconds
+  setTimeout(() => {
+    notification.style.opacity = '0';
+    notification.style.transform = 'translateY(20px)';
+    
+    setTimeout(() => {
+      notification.remove();
+    }, 300);
+  }, 4000);
 }
 
-// Set up a MutationObserver to detect new code blocks added to the page
-const observer = new MutationObserver((mutations) => {
-  if (isAnalysisActive) {
-    processCodeBlocks();
-  }
-});
-
-// Start observing the document with the configured parameters
-observer.observe(document.body, { childList: true, subtree: true });
-
-// Listen for messages from the popup or background script
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'activateAnalysis') {
-    isAnalysisActive = true;
-    processCodeBlocks();
-    sendResponse({ success: true });
-  } else if (message.action === 'deactivateAnalysis') {
-    isAnalysisActive = false;
-    toggleSidebar(false);
-    sendResponse({ success: true });
-  }
-  return true;
-});
-
-// Add the required CSS for proper display
-const style = document.createElement('style');
-style.textContent = `
-  .param-highlight {
-    background-color: #fef08a;
-    border-radius: 4px;
-    padding: 0 4px;
-    cursor: pointer;
-    transition: background-color 0.2s;
+// Detect ML framework from code
+function detectFrameworks(code) {
+  const frameworks = [];
+  
+  // TensorFlow patterns
+  if (code.includes('tf.') || code.includes('tensorflow') || 
+      code.includes('keras.') || code.includes('Sequential()')) {
+    frameworks.push('tensorflow');
   }
   
-  .param-highlight:hover {
-    background-color: #fde047;
+  // PyTorch patterns
+  if (code.includes('torch.') || code.includes('nn.Module') || 
+      code.includes('optim.') || code.includes('from torch import')) {
+    frameworks.push('pytorch');
   }
   
-  .analyze-button {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background-color: #6366f1;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    padding: 4px 8px;
-    font-size: 12px;
-    cursor: pointer;
-    z-index: 10;
-    font-family: 'Inter', sans-serif;
-    transition: background-color 0.2s;
+  // Scikit-learn patterns
+  if (code.includes('sklearn.') || code.includes('from sklearn import')) {
+    frameworks.push('scikit-learn');
   }
   
-  .analyze-button:hover {
-    background-color: #4f46e5;
+  // XGBoost patterns
+  if (code.includes('xgboost') || code.includes('XGBClassifier') || 
+      code.includes('XGBRegressor')) {
+    frameworks.push('xgboost');
   }
-`;
-document.head.appendChild(style);
-
-// Load fonts
-const fontLink = document.createElement('link');
-fontLink.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap';
-fontLink.rel = 'stylesheet';
-document.head.appendChild(fontLink);
-
-// Load Chart.js for visualizations
-const chartScript = document.createElement('script');
-chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
-document.head.appendChild(chartScript);
-
-// Load visualizations script
-const visualizationsScript = document.createElement('script');
-visualizationsScript.src = chrome.runtime.getURL('visualizations.js');
-document.head.appendChild(visualizationsScript);
-
-// Initial process of code blocks (in case they're already on the page)
-setTimeout(() => {
-  // Check chrome.storage for auto-activate setting
-  chrome.storage?.sync?.get(['autoActivate'], (result) => {
-    if (result.autoActivate !== false) { // Default to true if not set
-      isAnalysisActive = true;
-      processCodeBlocks();
-    }
-  });
-}, 1000);
+  
+  // Hugging Face patterns
+  if (code.includes('transformers') || code.includes('from transformers import')) {
+    frameworks.push('huggingface');
+  }
+  
+  return frameworks.length > 0 ? frameworks : ['unknown'];
+}

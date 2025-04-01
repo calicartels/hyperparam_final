@@ -2,43 +2,51 @@
   "manifest_version": 3,
   "name": "HyperExplainer",
   "version": "1.0.0",
-  "description": "Identifies, explains, and suggests alternatives for hyperparameters in LLM-generated code",
+  "description": "AI-powered tool to explain machine learning hyperparameters in code",
   "icons": {
-    "16": "icons/icon16.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
+    "16": "images/icon16.png",
+    "48": "images/icon48.png",
+    "128": "images/icon128.png"
   },
   "action": {
-    "default_popup": "index.html",
     "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
-    }
+      "16": "images/icon16.png",
+      "48": "images/icon48.png",
+      "128": "images/icon128.png"
+    },
+    "default_title": "HyperExplainer"
   },
-  "permissions": [
-    "storage",
-    "contextMenus",
-    "activeTab"
-  ],
-  "host_permissions": [
-    "*://*.openai.com/*"
-  ],
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["*://*.openai.com/*"],
-      "js": ["content.js"],
-      "run_at": "document_end"
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://github.com/*",
+        "https://colab.research.google.com/*"
+      ],
+      "js": ["content.js", "visualizations.js"],
+      "css": ["styles.css"]
     }
   ],
-  "options_page": "index.html#/options",
+  "permissions": [
+    "storage",
+    "tabs",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "https://hyperexplainer.replit.app/*"
+  ],
   "web_accessible_resources": [
     {
-      "resources": ["icons/*.png", "visualizations.js"],
-      "matches": ["*://*.openai.com/*"]
+      "resources": ["index.html", "images/*"],
+      "matches": ["<all_urls>"]
     }
-  ]
+  ],
+  "options_page": "index.html?page=options",
+  "options_ui": {
+    "page": "index.html?page=options",
+    "open_in_tab": true
+  }
 }

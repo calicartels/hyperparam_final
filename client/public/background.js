@@ -1,64 +1,79 @@
-// Background script for HyperExplainer extension
-
-// Initialize extension when installed
+// Set up Chrome extension background script
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('HyperExplainer extension installed');
+  console.log('HyperExplainer extension has been installed');
   
-  // Set default settings
-  chrome.storage.sync.set({
-    autoActivate: true,
-    showSidebar: true,
-    highlightParams: true,
-    showImpactLevel: true
+  // Show tutorial on first install
+  chrome.storage.local.get(['tutorialCompleted'], (result) => {
+    if (!result.tutorialCompleted) {
+      chrome.tabs.create({ url: chrome.runtime.getURL('index.html?tutorial=true') });
+      chrome.storage.local.set({ tutorialCompleted: true });
+    }
   });
 });
 
-// Listen for messages from popup or content script
+// Listen for messages from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'getSettings') {
-    chrome.storage.sync.get(null, (settings) => {
-      sendResponse({ settings });
+  if (message.type === 'GET_HYPERPARAMETER_INFO') {
+    // Forward the request to our backend API
+    const { paramName, paramValue, framework, codeContext } = message.data;
+    
+    fetch('https://hyperexplainer.replit.app/api/llm/explain-hyperparameter', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        paramName,
+        paramValue,
+        framework,
+        codeContext
+      }),
+    })
+    .then(response => response.json())
+    .then(data => {
+      sendResponse({ success: true, data });
+    })
+    .catch(error => {
+      console.error('Error fetching hyperparameter info:', error);
+      sendResponse({ success: false, error: error.message });
     });
-    return true; // Required for async response
+    
+    return true; // Keep the message channel open for async response
   }
 });
 
-// Listen for tab updates to inject the content script on ChatGPT pages
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url && tab.url.includes('chat.openai.com')) {
-    // Check if autoActivate is enabled
-    chrome.storage.sync.get(['autoActivate'], (result) => {
-      if (result.autoActivate) {
-        // Activate analysis on the page
-        chrome.tabs.sendMessage(tabId, { action: 'activateAnalysis' }, (response) => {
-          // Handle no response (content script might not be loaded yet)
-          if (chrome.runtime.lastError) {
-            console.log('Content script not ready yet, retrying...');
-            
-            // Wait a bit and retry
-            setTimeout(() => {
-              chrome.tabs.sendMessage(tabId, { action: 'activateAnalysis' });
-            }, 1000);
-          }
-        });
-      }
-    });
+// Listen for browser action (toolbar icon) clicks
+chrome.action.onClicked.addListener((tab) => {
+  // Check if we're on a supported site (like ChatGPT)
+  const url = new URL(tab.url);
+  const isSupportedSite = 
+    url.hostname.includes('openai.com') || 
+    url.hostname.includes('chat.openai.com') ||
+    url.hostname.includes('github.com') ||
+    url.hostname.includes('colab.research.google.com');
+  
+  if (isSupportedSite) {
+    // Toggle the extension visibility on the page
+    chrome.tabs.sendMessage(tab.id, { action: 'TOGGLE_EXTENSION' });
+  } else {
+    // Open options page if not on a supported site
+    chrome.runtime.openOptionsPage();
   }
 });
 
-// Add context menu for quick access to extension features
+// Setup context menu for quick analysis
 chrome.contextMenus.create({
-  id: "analyze-code",
-  title: "Analyze Code for Hyperparameters",
-  contexts: ["selection"],
-  documentUrlPatterns: ["*://*.openai.com/*"]
+  id: 'analyze-hyperparameters',
+  title: 'Analyze hyperparameters in code',
+  contexts: ['selection']
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === "analyze-code") {
-    chrome.tabs.sendMessage(tab.id, {
-      action: 'activateAnalysis',
-      selectedText: info.selectionText
+  if (info.menuItemId === 'analyze-hyperparameters' && info.selectionText) {
+    // Open new tab with analysis
+    const encodedText = encodeURIComponent(info.selectionText);
+    chrome.tabs.create({
+      url: `https://hyperexplainer.replit.app/?code=${encodedText}`
     });
   }
 });

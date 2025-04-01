@@ -7,6 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LLMExplanationCard } from '@/components/LLMExplanationCard';
 import { HyperparameterVisualizations } from '@/components/SimpleHyperparameterVisualizations';
+import { NetworkVisualization } from '@/components/NetworkVisualization';
+import { BenchmarkComparison } from '@/components/BenchmarkComparison';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { checkLLMStatus, getHyperparameterExplanation, generateFallbackExplanation, LLMStatusResponse } from '@/lib/llmService';
 import { Switch } from '@/components/ui/switch';
 import { Tutorial } from '@/components/Tutorial';
@@ -212,11 +215,38 @@ model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['ac
         
         <div className="space-y-6">
           <LLMExplanationCard explanation={explanation} isLoading={isLoading} />
-          <HyperparameterVisualizations 
-            paramName={paramName} 
-            paramValue={paramValue} 
-            framework={framework} 
-          />
+          
+          <Tabs defaultValue="visualization" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="visualization">Parameter Visualization</TabsTrigger>
+              <TabsTrigger value="network">Neural Network</TabsTrigger>
+              <TabsTrigger value="benchmark">Benchmark</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="visualization" className="space-y-4">
+              <HyperparameterVisualizations 
+                paramName={paramName} 
+                paramValue={paramValue} 
+                framework={framework} 
+              />
+            </TabsContent>
+            
+            <TabsContent value="network" className="space-y-4">
+              <NetworkVisualization 
+                paramName={paramName} 
+                paramValue={paramValue} 
+                framework={framework} 
+              />
+            </TabsContent>
+            
+            <TabsContent value="benchmark" className="space-y-4">
+              <BenchmarkComparison 
+                paramName={paramName} 
+                paramValue={paramValue} 
+                framework={framework} 
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
       

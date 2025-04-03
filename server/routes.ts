@@ -44,6 +44,10 @@ function initializeVertexAI() {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Initialize Vertex AI when routes are registered
+  const vertexInitialized = initializeVertexAI();
+  console.log(`Vertex AI initialization status at startup: ${vertexInitialized ? 'SUCCESS' : 'FAILED'}`);
+  
   // API route to get all hyperparameters
   app.get("/api/hyperparameters", async (req, res) => {
     try {
@@ -98,12 +102,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Route to check if LLM integration is available
   app.get("/api/llm/status", (_req: Request, res: Response) => {
     // Try to initialize if not already done
+    let isAvailable = vertexai !== null;
+    
     if (!vertexai) {
-      initializeVertexAI();
+      isAvailable = initializeVertexAI();
     }
     
     res.json({
-      available: vertexai !== null,
+      available: isAvailable,
       provider: "Google Vertex AI",
       model: "gemini-pro",
       requiresAuth: true
@@ -218,7 +224,8 @@ Format your response as JSON with the following structure:
           });
         } catch (jsonError) {
           console.error("Error parsing JSON response:", jsonError as Error);
-          return res.status(500).json({
+          return res.status(200).json({
+            success: false,
             error: "Error parsing LLM response",
             rawResponse: responseText,
             fallbackAvailable: true
@@ -226,7 +233,8 @@ Format your response as JSON with the following structure:
         }
       } catch (llmError: unknown) {
         console.error("Error calling LLM API:", llmError);
-        return res.status(500).json({
+        return res.status(200).json({
+          success: false,
           error: "Error generating explanation with LLM",
           details: llmError instanceof Error ? llmError.message : String(llmError),
           fallbackAvailable: true
@@ -234,7 +242,8 @@ Format your response as JSON with the following structure:
       }
     } catch (error: unknown) {
       console.error("Server error:", error);
-      return res.status(500).json({
+      return res.status(200).json({
+        success: false,
         error: "Server error",
         details: error instanceof Error ? error.message : String(error),
         fallbackAvailable: true

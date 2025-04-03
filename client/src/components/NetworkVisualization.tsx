@@ -55,11 +55,17 @@ export function NetworkVisualization({
     if (!ctx) return;
     
     // Set canvas dimensions
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
-    
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Adding a small delay to ensure the canvas dimensions are properly set
+    // This is especially important when the component is first mounted
+    setTimeout(() => {
+      if (canvas.clientWidth > 0 && canvas.clientHeight > 0) {
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }, 100);
     
     // Parameters for the neural network visualization
     const getNetworkParams = () => {

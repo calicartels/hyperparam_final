@@ -8,7 +8,14 @@ import { setupGoogleCloudCredentials } from './auth';
 dotenv.config();
 
 // Setup Google Cloud credentials
-setupGoogleCloudCredentials();
+const googleCredentialsValid = setupGoogleCloudCredentials();
+
+// Log credentials status
+if (googleCredentialsValid) {
+  console.log('Google Cloud credentials successfully configured');
+} else {
+  console.warn('Google Cloud credentials not configured or invalid - LLM features will use fallback mode');
+}
 
 const app = express();
 app.use(express.json());

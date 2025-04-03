@@ -1020,17 +1020,21 @@ export function HyperparameterPlayground() {
 
         {/* Visualizations */}
         <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
-          <NetworkVisualization 
-            paramName={activeParameter.name}
-            paramValue={activeParameter.value}
-            framework={activeParameter.framework}
-          />
+          <div className="w-full">
+            <NetworkVisualization 
+              paramName={activeParameter.name}
+              paramValue={activeParameter.value}
+              framework={activeParameter.framework}
+            />
+          </div>
           
-          <HyperparameterVisualizations
-            paramName={activeParameter.name}
-            paramValue={activeParameter.value}
-            framework={activeParameter.framework}
-          />
+          <div className="w-full">
+            <HyperparameterVisualizations
+              paramName={activeParameter.name}
+              paramValue={activeParameter.value}
+              framework={activeParameter.framework}
+            />
+          </div>
         </div>
         
         {/* Benchmark Comparison */}

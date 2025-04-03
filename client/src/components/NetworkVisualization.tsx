@@ -17,36 +17,132 @@ export function NetworkVisualization({
   framework 
 }: NetworkVisualizationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [selectedValue, setSelectedValue] = useState<number>(parseFloat(paramValue) || 0);
-  const [networkType, setNetworkType] = useState<string>("dense");
-  const [animationFrame, setAnimationFrame] = useState<number | null>(null);
-  const [showAnimation, setShowAnimation] = useState(true); // Start with animation enabled by default
+  const animationRef = useRef<number | null>(null);
+  const isFirstRender = useRef(true);
   
-  const getValueRange = () => {
-    if (paramName.includes('learning_rate') || paramName.includes('lr')) {
-      return { min: 0.0001, max: 0.1, step: 0.0001, defaultValue: 0.001 };
-    } else if (paramName.includes('batch_size')) {
-      return { min: 8, max: 256, step: 8, defaultValue: 32 };
+  // Animation state
+  const [showAnimation, setShowAnimation] = useState<boolean>(true);
+  
+  // Network type
+  const [networkType, setNetworkType] = useState<string>('dense');
+  
+  // Get parameter range
+  const getParameterRange = (): { min: number; max: number; step: number; defaultValue: number } => {
+    if (paramName.includes('learning_rate')) {
+      return { min: 0.0001, max: 0.01, step: 0.0001, defaultValue: 0.001 };
     } else if (paramName.includes('dropout')) {
-      return { min: 0, max: 0.9, step: 0.1, defaultValue: 0.5 };
-    } else if (paramName.includes('hidden') || paramName.includes('units') || paramName.includes('neurons')) {
-      return { min: 8, max: 512, step: 8, defaultValue: 64 };
-    } else if (paramName.includes('layers')) {
-      return { min: 1, max: 10, step: 1, defaultValue: 3 };
+      return { min: 0, max: 0.9, step: 0.05, defaultValue: 0.5 };
+    } else if (paramName.includes('batch_size')) {
+      // Represent batch size as a continuous param for the slider
+      return { min: 1, max: 512, step: 1, defaultValue: 32 };
+    } else if (paramName.includes('momentum')) {
+      return { min: 0, max: 0.99, step: 0.01, defaultValue: 0.9 };
+    } else if (paramName.includes('weight_decay')) {
+      return { min: 0, max: 0.1, step: 0.001, defaultValue: 0.01 };
+    } else if (paramName.includes('epochs')) {
+      return { min: 1, max: 100, step: 1, defaultValue: 10 };
     } else {
+      // Default range
       return { min: 0, max: 1, step: 0.01, defaultValue: 0.5 };
     }
   };
   
-  const range = getValueRange();
-  const initialValue = parseFloat(paramValue) || range.defaultValue;
+  // Get range and set initial value
+  const range = getParameterRange();
+  const [selectedValue, setSelectedValue] = useState<number>(
+    paramValue ? parseFloat(paramValue) : range.defaultValue
+  );
   
+  // Handle canvas setup - only ONCE on mount
   useEffect(() => {
-    // Initialize with the initial value from props
-    setSelectedValue(initialValue);
-  }, [paramValue]);
-
-  // Draw the neural network
+    if (!canvasRef.current) return;
+    
+    const setupCanvas = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      
+      // Handle high-DPI displays properly
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      
+      // Set the canvas attributes properly for high DPI displays
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+      
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        // Scale the context to compensate for high-DPI
+        ctx.scale(dpr, dpr);
+      }
+    };
+    
+    // Set up canvas after a small delay to ensure dimensions are correct
+    setTimeout(setupCanvas, 100);
+  }, []);
+  
+  // Convert parameter value to network parameters
+  const getNetworkParams = () => {
+    if (!canvasRef.current) return null;
+    
+    const canvas = canvasRef.current;
+    const width = canvas.width / (window.devicePixelRatio || 1);
+    const height = canvas.height / (window.devicePixelRatio || 1);
+    
+    // Base params
+    const params = {
+      layerCount: 4,
+      neuronsPerLayer: [5, 7, 7, 3],
+      connectionOpacity: 0.3,
+      connectionThickness: 1,
+      neuronSize: 7,
+      layerSpacing: width / 5,
+      canvasHeight: height,
+      dropoutRate: 0,
+    };
+    
+    // Parameter-specific effects
+    if (paramName.includes('learning_rate')) {
+      // Learning rate affects connection strength/opacity
+      const normalizedLR = (selectedValue - range.min) / (range.max - range.min);
+      params.connectionOpacity = 0.2 + normalizedLR * 0.6;
+      params.connectionThickness = 0.5 + normalizedLR * 1.5;
+    } else if (paramName.includes('dropout')) {
+      // Dropout directly affects dropout rate
+      params.dropoutRate = selectedValue;
+    } else if (paramName.includes('batch_size')) {
+      // Batch size affects number of neurons
+      const normalizedBS = (selectedValue - range.min) / (range.max - range.min);
+      const baseNeurons = 3;
+      const maxNeurons = 10;
+      const neuronCount = Math.round(baseNeurons + normalizedBS * (maxNeurons - baseNeurons));
+      params.neuronsPerLayer = [neuronCount, neuronCount + 2, neuronCount + 2, Math.max(2, Math.round(neuronCount / 2))];
+    } else if (paramName.includes('momentum')) {
+      // Momentum affects connection thickness
+      const normalizedMomentum = (selectedValue - range.min) / (range.max - range.min);
+      params.connectionThickness = 0.5 + normalizedMomentum * 2.5;
+    } else if (paramName.includes('weight_decay')) {
+      // Weight decay inversely affects connection strength
+      const normalizedWD = (selectedValue - range.min) / (range.max - range.min);
+      params.connectionOpacity = 0.5 - normalizedWD * 0.3;
+    } else if (paramName.includes('epochs')) {
+      // More epochs = more complex network
+      const normalizedEpochs = (selectedValue - range.min) / (range.max - range.min);
+      const minLayers = 3;
+      const maxLayers = 6;
+      params.layerCount = Math.round(minLayers + normalizedEpochs * (maxLayers - minLayers));
+      params.neuronsPerLayer = Array(params.layerCount).fill(0).map((_, i) => {
+        if (i === 0) return 5; // Input layer
+        if (i === params.layerCount - 1) return 3; // Output layer
+        return 7; // Hidden layers
+      });
+    }
+    
+    return params;
+  };
+  
+  // Animation and drawing effect
   useEffect(() => {
     if (!canvasRef.current) return;
     
@@ -54,194 +150,57 @@ export function NetworkVisualization({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    // Set canvas dimensions
-    // Adding a small delay to ensure the canvas dimensions are properly set
-    // This is especially important when the component is first mounted
-    setTimeout(() => {
-      if (canvas.clientWidth > 0 && canvas.clientHeight > 0) {
-        canvas.width = canvas.clientWidth;
-        canvas.height = canvas.clientHeight;
-        
-        // Clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-      }
-    }, 100);
+    // Clear any existing animation
+    if (animationRef.current) {
+      clearTimeout(animationRef.current);
+      animationRef.current = null;
+    }
     
-    // Parameters for the neural network visualization
-    const getNetworkParams = () => {
-      if (paramName.includes('learning_rate') || paramName.includes('lr')) {
-        // For learning rate, affect connection line thickness and saturation
-        return {
-          layerCount: 4,
-          neuronsPerLayer: [5, 8, 8, 3],
-          connectionOpacity: 0.3 + selectedValue * 7, // Higher learning rate = more saturated connections
-          connectionThickness: 0.5 + selectedValue * 20, // Higher learning rate = thicker connections
-          neuronSize: 12,
-          layerSpacing: canvas.width / 5
-        };
-      } else if (paramName.includes('batch_size')) {
-        // For batch size, affect number of visible neurons
-        const batchSizeFactor = Math.min(1, selectedValue / 128);
-        const neuronsPerLayerBase = [4, 6, 6, 2];
-        return {
-          layerCount: 4,
-          neuronsPerLayer: neuronsPerLayerBase.map(n => Math.max(2, Math.round(n * (0.5 + batchSizeFactor)))),
-          connectionOpacity: 0.5,
-          connectionThickness: 1.5,
-          neuronSize: 12,
-          layerSpacing: canvas.width / 5
-        };
-      } else if (paramName.includes('dropout')) {
-        // For dropout, show some neurons as inactive
-        return {
-          layerCount: 4,
-          neuronsPerLayer: [5, 10, 10, 3],
-          connectionOpacity: 0.5,
-          connectionThickness: 1.5,
-          neuronSize: 12,
-          layerSpacing: canvas.width / 5,
-          dropoutRate: selectedValue // Percentage of neurons to drop
-        };
-      } else if (paramName.includes('hidden') || paramName.includes('units') || paramName.includes('neurons')) {
-        // For hidden units/neurons, affect the number of neurons in hidden layers
-        const neuronsInHidden = Math.max(2, Math.round(selectedValue / 20));
-        return {
-          layerCount: 4,
-          neuronsPerLayer: [5, neuronsInHidden, neuronsInHidden, 3],
-          connectionOpacity: 0.5,
-          connectionThickness: 1.5,
-          neuronSize: 12,
-          layerSpacing: canvas.width / 5
-        };
-      } else if (paramName.includes('layers')) {
-        // For layer count, affect the number of layers
-        const layerCount = Math.max(2, Math.round(selectedValue));
-        const neuronsPerLayer = [5];
-        
-        // Add hidden layers
-        for (let i = 0; i < layerCount; i++) {
-          neuronsPerLayer.push(8);
-        }
-        
-        // Add output layer
-        neuronsPerLayer.push(3);
-        
-        return {
-          layerCount: layerCount + 2, // input + hidden + output
-          neuronsPerLayer,
-          connectionOpacity: 0.5,
-          connectionThickness: 1.5,
-          neuronSize: 12,
-          layerSpacing: canvas.width / (layerCount + 3) // Adjust spacing based on layer count
-        };
-      } else {
-        // Default visualization
-        return {
-          layerCount: 4,
-          neuronsPerLayer: [5, 8, 8, 3],
-          connectionOpacity: 0.5,
-          connectionThickness: 1.5,
-          neuronSize: 12,
-          layerSpacing: canvas.width / 5
-        };
-      }
-    };
+    // Account for device pixel ratio
+    const dpr = window.devicePixelRatio || 1;
+    const displayWidth = canvas.width / dpr;
+    const displayHeight = canvas.height / dpr;
     
+    // Get network parameters
     const params = getNetworkParams();
+    if (!params) return;
     
     // For static rendering when animation is off
     if (!showAnimation) {
-      drawNeuralNetwork(ctx, canvas, params, networkType, false);
+      // Clear the canvas properly accounting for DPR
+      ctx.clearRect(0, 0, displayWidth, displayHeight);
+      drawNeuralNetwork(ctx, displayWidth, displayHeight, params, networkType, false);
       return;
     }
     
-    // For animation, set up an animation loop with MUCH SLOWER speed
-    let lastTimestamp = 0;
+    // For animation, use a consistent approach with setTimeout
+    let startTime = Date.now();
     
-    // Get the requestAnimationFrame polyfill (for cross-browser compatibility)
-    const requestAnimationFramePolyfill = 
-      window.requestAnimationFrame ||
-      function(callback) {
-        return window.setTimeout(callback, 1000 / 60);
-      };
-    
-    const animateNetwork = (timestamp: number) => {
-      // Calculate time delta
-      if (!lastTimestamp) lastTimestamp = timestamp;
-      const elapsed = timestamp - lastTimestamp;
-      lastTimestamp = timestamp;
+    const animate = () => {
+      // Calculate elapsed time (very slow for educational purposes)
+      const elapsed = (Date.now() - startTime) / 50000; // 50-second cycle
       
-      // Clear canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Clear the canvas properly accounting for DPR
+      ctx.clearRect(0, 0, displayWidth, displayHeight);
       
-      // Draw the network with animation - use an EXTREMELY slow time factor (divide by 25000 instead of 1000)
-      // This makes the animation approximately 25x slower for a very clear educational visualization
-      // The slow speed ensures compatibility across devices, browsers and platforms (including Chrome extensions)
-      drawNeuralNetwork(ctx, canvas, params, networkType, true, timestamp / 25000);
+      // Draw the network with animation
+      drawNeuralNetwork(ctx, displayWidth, displayHeight, params, networkType, true, elapsed);
       
-      // Continue animation loop using the polyfill for cross-browser support
-      const frame = requestAnimationFramePolyfill(animateNetwork);
-      setAnimationFrame(frame);
+      // Loop with consistent timing
+      animationRef.current = window.setTimeout(animate, 100); // 10fps is plenty for this visualization
     };
     
-    // Start animation loop with polyfill
-    const frame = requestAnimationFramePolyfill(animateNetwork);
-    setAnimationFrame(frame);
+    // Start animation
+    animate();
     
-    // Clean up function - use polyfill
-    const cancelAnimationFramePolyfill = 
-      window.cancelAnimationFrame ||
-      function(id) {
-        window.clearTimeout(id);
-      };
-      
+    // Cleanup
     return () => {
-      if (animationFrame !== null) {
-        cancelAnimationFramePolyfill(animationFrame);
+      if (animationRef.current) {
+        clearTimeout(animationRef.current);
+        animationRef.current = null;
       }
     };
   }, [selectedValue, networkType, paramName, showAnimation]);
-  
-  // Clean up animation frame on unmount and provide cross-platform compatibility
-  useEffect(() => {
-    // Polyfill for requestAnimationFrame to ensure compatibility across browsers
-    // (including older Safari versions on Mac)
-    const requestAnimationFramePolyfill = 
-      window.requestAnimationFrame ||
-      function(callback) {
-        return window.setTimeout(callback, 1000 / 60);
-      };
-      
-    // Polyfill for cancelAnimationFrame
-    const cancelAnimationFramePolyfill = 
-      window.cancelAnimationFrame ||
-      function(id) {
-        window.clearTimeout(id);
-      };
-    
-    // Set up device pixel ratio handling for high-DPI displays (Retina/Mac)
-    if (canvasRef.current) {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        // Handle high-DPI displays (like MacBook Retina)
-        const devicePixelRatio = window.devicePixelRatio || 1;
-        if (devicePixelRatio > 1) {
-          canvas.style.width = canvas.width + 'px';
-          canvas.style.height = canvas.height + 'px';
-          canvas.width = canvas.width * devicePixelRatio;
-          canvas.height = canvas.height * devicePixelRatio;
-          ctx.scale(devicePixelRatio, devicePixelRatio);
-        }
-      }
-    }
-    
-    return () => {
-      if (animationFrame !== null) {
-        cancelAnimationFramePolyfill(animationFrame);
-      }
-    };
-  }, []);
   
   const handleValueChange = (value: number[] | number) => {
     if (Array.isArray(value)) {
@@ -267,14 +226,12 @@ export function NetworkVisualization({
             <SelectContent>
               <SelectItem value="dense">Dense (Fully Connected)</SelectItem>
               <SelectItem value="cnn">Convolutional (CNN)</SelectItem>
-              <SelectItem value="rnn">Recurrent (RNN)</SelectItem>
-              <SelectItem value="transformer">Transformer</SelectItem>
             </SelectContent>
           </Select>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="w-full h-60 relative">
+        <div className="w-full h-60 relative border border-gray-200 rounded-md">
           <canvas 
             ref={canvasRef} 
             className="w-full h-full" 
@@ -291,7 +248,7 @@ export function NetworkVisualization({
               variant={showAnimation ? "default" : "outline"} 
               onClick={toggleAnimation}
             >
-              {showAnimation ? "Pause Animation" : "Resume Animation"}
+              {showAnimation ? "Pause Animation" : "Play Animation"}
             </Button>
           </div>
           <Slider
@@ -312,7 +269,6 @@ export function NetworkVisualization({
               <ul className="list-disc list-inside mt-2 text-xs space-y-1">
                 <li>Higher learning rates (values like 0.01) show as brighter, more intense connections</li>
                 <li>Lower learning rates (values like 0.0001) show as more subtle, controlled signal flow</li>
-                <li>The animation demonstrates how signals transmit at different speeds based on learning rate</li>
               </ul>
             </>
           )}
@@ -321,9 +277,8 @@ export function NetworkVisualization({
             <>
               <p>This visualization shows how <strong>{paramName}</strong> affects neural network training:</p>
               <ul className="list-disc list-inside mt-2 text-xs space-y-1">
-                <li>Inactive neurons (marked with X) demonstrate the dropout effect</li>
+                <li>Inactive neurons (transparent) demonstrate the dropout effect</li>
                 <li>Higher dropout rates disable more neurons during training</li>
-                <li>The animation shows the changing pattern of active neurons during training</li>
               </ul>
             </>
           )}
@@ -334,7 +289,6 @@ export function NetworkVisualization({
               <ul className="list-disc list-inside mt-2 text-xs space-y-1">
                 <li>Larger batch sizes allow the network to process more examples at once</li>
                 <li>The number of active neurons corresponds to batch size capacity</li>
-                <li>The animation demonstrates parallel processing patterns</li>
               </ul>
             </>
           )}
@@ -342,8 +296,6 @@ export function NetworkVisualization({
           {(!paramName.includes('learning_rate') && !paramName.includes('dropout') && !paramName.includes('batch_size')) && (
             <p>This visualization shows how changing the <strong>{paramName}</strong> affects the neural network architecture and behavior.</p>
           )}
-          
-          <p className="mt-2 text-xs text-gray-500">The animation intentionally runs at a very slow, educational pace to help you observe how parameters affect network behavior. You can pause it anytime for a closer look.</p>
         </div>
       </CardContent>
     </Card>
@@ -353,90 +305,88 @@ export function NetworkVisualization({
 // Helper function to draw a neural network
 function drawNeuralNetwork(
   ctx: CanvasRenderingContext2D, 
-  canvas: HTMLCanvasElement, 
+  width: number,
+  height: number,
   params: any,
   networkType: string = 'dense',
   animate: boolean = false,
-  customTime?: number
+  time: number = 0
 ) {
   const { 
     layerCount, 
     neuronsPerLayer, 
     connectionOpacity, 
     connectionThickness,
-    neuronSize,
+    neuronSize = 10,
     layerSpacing,
     dropoutRate = 0
   } = params;
   
   // Colors
-  const activeNeuronColor = '#4F46E5';
-  const inactiveNeuronColor = '#d1d5db';
-  const connectionColor = `rgba(79, 70, 229, ${connectionOpacity})`;
-  const activationColor = '#ef4444';
+  const activeNeuronColor = '#4F46E5'; // Indigo
+  const outputNeuronColor = '#EF4444'; // Red
+  const inactiveNeuronColor = 'rgba(209, 213, 219, 0.5)'; // Light gray, semi-transparent
   
-  // Set time variable for animation
-  const time = animate ? (customTime !== undefined ? customTime : Date.now() / 1000) : 0;
+  // Calculate neuron positions for each layer
+  const layers: Array<Array<{x: number, y: number, active: boolean, isOutput: boolean}>> = [];
   
-  // Clear the canvas
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  
-  // Store neuron positions
-  const neurons: {x: number, y: number, active: boolean}[][] = [];
-  
-  // Draw each layer
-  for (let layerIdx = 0; layerIdx < layerCount; layerIdx++) {
-    const neuronsInLayer = neuronsPerLayer[layerIdx];
-    const layerX = (layerIdx + 1) * layerSpacing;
+  for (let l = 0; l < layerCount; l++) {
+    const layer: Array<{x: number, y: number, active: boolean, isOutput: boolean}> = [];
+    const neuronsInThisLayer = neuronsPerLayer[l] || 5;
+    const isOutputLayer = l === layerCount - 1;
     
-    neurons[layerIdx] = [];
+    // X position is based on layer index
+    const x = (l + 1) * (width / (layerCount + 1));
     
-    // Draw neurons for this layer
-    for (let neuronIdx = 0; neuronIdx < neuronsInLayer; neuronIdx++) {
-      // Calculate vertical position with even spacing
-      const layerHeight = canvas.height * 0.8;
-      const margin = canvas.height * 0.1;
-      const spacing = layerHeight / (neuronsInLayer - 1 || 1);
-      const neuronY = neuronIdx * spacing + margin;
+    // Calculate neuron positions for this layer
+    for (let n = 0; n < neuronsInThisLayer; n++) {
+      // Y position distributes neurons evenly
+      const y = height * 0.1 + (n * (height * 0.8) / (neuronsInThisLayer - 1 || 1));
       
-      // Determine if neuron is active (use dropout rate for hidden layers)
-      const isActive = layerIdx === 0 || layerIdx === layerCount - 1 || 
-                      Math.random() > dropoutRate;
+      // Determine if neuron is active (apply dropout to hidden layers only)
+      const shouldApplyDropout = l > 0 && l < layerCount - 1;
+      const active = !shouldApplyDropout || Math.random() > dropoutRate;
       
-      // Store neuron position
-      neurons[layerIdx].push({
-        x: layerX,
-        y: neuronY,
-        active: isActive
-      });
+      layer.push({ x, y, active, isOutput: isOutputLayer });
     }
+    
+    layers.push(layer);
   }
   
-  // Draw connections first (so they appear behind neurons)
-  for (let layerIdx = 0; layerIdx < layerCount - 1; layerIdx++) {
-    const fromLayer = neurons[layerIdx];
-    const toLayer = neurons[layerIdx + 1];
+  // Draw connections before neurons so they appear behind
+  for (let l = 0; l < layers.length - 1; l++) {
+    const fromLayer = layers[l];
+    const toLayer = layers[l + 1];
     
     // Different connection patterns based on network type
     if (networkType === 'dense') {
-      // Fully connected layers
+      // Fully connected: each neuron connects to all neurons in next layer
       for (const fromNeuron of fromLayer) {
-        if (!fromNeuron.active) continue; // Skip inactive neurons
+        // Skip inactive neurons for drawing connections
+        if (!fromNeuron.active) continue;
         
         for (const toNeuron of toLayer) {
-          if (!toNeuron.active) continue; // Skip inactive neurons
+          // Skip inactive neurons for drawing connections
+          if (!toNeuron.active) continue;
           
-          // Animation effect - pulse the connections
+          // Animation effect - pulse the connections with a slow, educational pace
           let opacity = connectionOpacity;
           if (animate) {
+            // Calculate distance for wave effect
             const distance = Math.sqrt(
               Math.pow(toNeuron.x - fromNeuron.x, 2) + 
               Math.pow(toNeuron.y - fromNeuron.y, 2)
             );
-            const phase = (time * 1 + distance / 30) % 1; // Reduced from 3 to 1 for slower animation
+            
+            // Create a slow wave effect based on distance and time
+            // Scale time by a small factor to slow down animation
+            const phase = (time * 0.5 + distance / 200) % 1;
+            
+            // Sinusoidal pulsing effect
             opacity = connectionOpacity * (0.3 + 0.7 * Math.sin(phase * Math.PI));
           }
           
+          // Draw connection line
           ctx.beginPath();
           ctx.moveTo(fromNeuron.x, fromNeuron.y);
           ctx.lineTo(toNeuron.x, toNeuron.y);
@@ -446,24 +396,26 @@ function drawNeuralNetwork(
         }
       }
     } else if (networkType === 'cnn') {
-      // CNN-style local connections
+      // CNN: each neuron connects only to nearby neurons (simulating local receptive fields)
       const kernelSize = 3; // Simulate a 3x3 kernel
       
       for (let i = 0; i < fromLayer.length; i++) {
         const fromNeuron = fromLayer[i];
-        if (!fromNeuron.active) continue; // Skip inactive neurons
+        if (!fromNeuron.active) continue;
         
         // Connect to nearby neurons in next layer (simulating convolution)
         for (let j = 0; j < toLayer.length; j++) {
           const toNeuron = toLayer[j];
-          if (!toNeuron.active) continue; // Skip inactive neurons
+          if (!toNeuron.active) continue;
           
           // Only connect if neurons are within "kernel" range
-          const verticalDistance = Math.abs(i - j * (fromLayer.length / toLayer.length));
-          if (verticalDistance <= kernelSize / 2) {
+          const relativeIdx = i / fromLayer.length - j / toLayer.length;
+          if (Math.abs(relativeIdx) <= kernelSize / 10) {
             let opacity = connectionOpacity;
+            
             if (animate) {
-              const phase = (time * 0.7 + i / fromLayer.length) % 1; // Reduced for slower animation
+              // Subtle wave effect for CNN
+              const phase = (time * 0.3 + i / fromLayer.length) % 1;
               opacity = connectionOpacity * (0.3 + 0.7 * Math.sin(phase * Math.PI));
             }
             
@@ -476,179 +428,49 @@ function drawNeuralNetwork(
           }
         }
       }
-    } else if (networkType === 'rnn') {
-      // RNN-style with recurrent connections
-      for (const fromNeuron of fromLayer) {
-        if (!fromNeuron.active) continue; // Skip inactive neurons
-        
-        // Connect to next layer
-        for (const toNeuron of toLayer) {
-          if (!toNeuron.active) continue; // Skip inactive neurons
-          
-          let opacity = connectionOpacity;
-          if (animate) {
-            const phase = (time * 0.7) % 1; // Reduced for slower animation
-            opacity = connectionOpacity * (0.3 + 0.7 * Math.sin(phase * Math.PI));
-          }
-          
-          ctx.beginPath();
-          ctx.moveTo(fromNeuron.x, fromNeuron.y);
-          ctx.lineTo(toNeuron.x, toNeuron.y);
-          ctx.strokeStyle = `rgba(79, 70, 229, ${opacity})`;
-          ctx.lineWidth = connectionThickness;
-          ctx.stroke();
-        }
-        
-        // Draw recurrent connections (loops)
-        if (layerIdx > 0) {
-          // Draw curved recurrent connection
-          ctx.beginPath();
-          ctx.moveTo(fromNeuron.x, fromNeuron.y);
-          
-          const controlX1 = fromNeuron.x - 40;
-          const controlY1 = fromNeuron.y - 20;
-          const controlX2 = fromNeuron.x - 40;
-          const controlY2 = fromNeuron.y + 20;
-          
-          ctx.bezierCurveTo(
-            controlX1, controlY1,
-            controlX2, controlY2,
-            fromNeuron.x, fromNeuron.y
-          );
-          
-          let opacity = connectionOpacity * 0.7;
-          if (animate) {
-            const phase = (time * 0.7 + fromNeuron.y / canvas.height) % 1; // Reduced for slower animation
-            opacity = connectionOpacity * 0.7 * (0.3 + 0.7 * Math.sin(phase * Math.PI));
-          }
-          
-          ctx.strokeStyle = `rgba(79, 70, 229, ${opacity})`;
-          ctx.lineWidth = connectionThickness * 0.8;
-          ctx.stroke();
-        }
-      }
-    } else if (networkType === 'transformer') {
-      // Transformer-style attention connections
-      // First draw direct connections
-      for (const fromNeuron of fromLayer) {
-        if (!fromNeuron.active) continue; // Skip inactive neurons
-        
-        for (const toNeuron of toLayer) {
-          if (!toNeuron.active) continue; // Skip inactive neurons
-          
-          let opacity = connectionOpacity * 0.5; // More subtle direct connections
-          
-          ctx.beginPath();
-          ctx.moveTo(fromNeuron.x, fromNeuron.y);
-          ctx.lineTo(toNeuron.x, toNeuron.y);
-          ctx.strokeStyle = `rgba(79, 70, 229, ${opacity})`;
-          ctx.lineWidth = connectionThickness * 0.7;
-          ctx.stroke();
-        }
-      }
-      
-      // Then draw attention connections between neurons in the same layer
-      if (layerIdx > 0 && layerIdx < layerCount - 1) {
-        for (let i = 0; i < fromLayer.length; i++) {
-          const neuronA = fromLayer[i];
-          if (!neuronA.active) continue;
-          
-          for (let j = i + 1; j < fromLayer.length; j++) {
-            const neuronB = fromLayer[j];
-            if (!neuronB.active) continue;
-            
-            // Attention connection
-            let opacity = connectionOpacity * 0.3;
-            if (animate) {
-              const phase = (time * 0.5 + (i + j) / fromLayer.length) % 1; // Reduced for slower animation
-              opacity = connectionOpacity * 0.3 * (0.1 + 0.9 * Math.sin(phase * Math.PI));
-            }
-            
-            ctx.beginPath();
-            ctx.moveTo(neuronA.x, neuronA.y);
-            
-            // Create a curved connection
-            const midX = neuronA.x - 15; // Control point X
-            const midY = (neuronA.y + neuronB.y) / 2; // Control point Y
-            
-            ctx.quadraticCurveTo(midX, midY, neuronB.x, neuronB.y);
-            
-            ctx.strokeStyle = `rgba(79, 70, 229, ${opacity})`;
-            ctx.lineWidth = connectionThickness * 0.5;
-            ctx.stroke();
-          }
-        }
-      }
     }
   }
   
-  // Draw neurons
-  for (let layerIdx = 0; layerIdx < layerCount; layerIdx++) {
-    for (const neuron of neurons[layerIdx]) {
-      // Skip drawing some neurons in hidden layers based on dropout rate
-      if (!neuron.active) {
-        // Draw inactive neuron
+  // Draw all neurons on top of connections
+  for (let l = 0; l < layers.length; l++) {
+    for (const neuron of layers[l]) {
+      // Different appearance for active/inactive neurons
+      if (neuron.active) {
+        // Active neuron
+        ctx.beginPath();
+        ctx.arc(neuron.x, neuron.y, neuronSize, 0, Math.PI * 2);
+        ctx.fillStyle = neuron.isOutput ? outputNeuronColor : activeNeuronColor;
+        ctx.fill();
+      } else {
+        // Inactive neuron (dropout) - draw as hollow/transparent
         ctx.beginPath();
         ctx.arc(neuron.x, neuron.y, neuronSize, 0, Math.PI * 2);
         ctx.fillStyle = inactiveNeuronColor;
         ctx.fill();
         
-        // Draw a cross to indicate dropped neuron
+        // Draw X mark to indicate dropout
         ctx.beginPath();
         ctx.moveTo(neuron.x - neuronSize / 2, neuron.y - neuronSize / 2);
         ctx.lineTo(neuron.x + neuronSize / 2, neuron.y + neuronSize / 2);
         ctx.moveTo(neuron.x + neuronSize / 2, neuron.y - neuronSize / 2);
         ctx.lineTo(neuron.x - neuronSize / 2, neuron.y + neuronSize / 2);
-        ctx.strokeStyle = '#9ca3af';
+        ctx.strokeStyle = 'rgba(220, 38, 38, 0.5)';
         ctx.lineWidth = 1;
         ctx.stroke();
-        
-        continue;
       }
-      
-      // Draw active neuron
-      ctx.beginPath();
-      ctx.arc(neuron.x, neuron.y, neuronSize, 0, Math.PI * 2);
-      
-      // Neuron color - if animating, pulse the input and output layers
-      let fillColor = activeNeuronColor;
-      if (animate && (layerIdx === 0 || layerIdx === layerCount - 1)) {
-        const alpha = Math.sin(time * 0.5 + neuron.y / 50) * 0.5 + 0.5; // Reduced for slower animation
-        fillColor = layerIdx === 0 ? 
-          `rgba(79, 70, 229, ${0.7 + 0.3 * alpha})` : 
-          `rgba(239, 68, 68, ${0.7 + 0.3 * alpha})`;
-      } else if (layerIdx === layerCount - 1) {
-        // Output layer has a different color
-        fillColor = activationColor;
-      }
-      
-      ctx.fillStyle = fillColor;
-      ctx.fill();
-      
-      // Add a subtle border
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
     }
   }
   
-  // Text labels for layers
+  // Draw layer labels at the top
   ctx.font = '12px sans-serif';
-  ctx.fillStyle = '#4b5563';
   ctx.textAlign = 'center';
+  ctx.fillStyle = '#6b7280';
   
-  // Input layer
-  ctx.fillText('Input', neurons[0][0].x, 15);
-  
-  // Hidden layers
-  for (let i = 1; i < layerCount - 1; i++) {
-    let label = 'Hidden';
-    if (layerCount > 3) {
-      label = `Hidden ${i}`;
+  // Draw layer names
+  const layerNames = ['Input', ...Array(layerCount - 2).fill(0).map((_, i) => `Hidden ${i+1}`), 'Output'];
+  for (let l = 0; l < layerCount; l++) {
+    if (layers[l].length > 0) {
+      ctx.fillText(layerNames[l], layers[l][0].x, 20);
     }
-    ctx.fillText(label, neurons[i][0].x, 15);
   }
-  
-  // Output layer
-  ctx.fillText('Output', neurons[layerCount - 1][0].x, 15);
 }

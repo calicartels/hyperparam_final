@@ -9,7 +9,7 @@ dist/
 
 # Credentials
 credentials/*
-
+hyperparam_final/credentials/google-service-account-key.json
 # Logs
 *.log
 npm-debug.log*

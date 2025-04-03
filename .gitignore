@@ -8,8 +8,7 @@ dist/
 .env
 
 # Credentials
-credentials/*
-hyperparam_final/credentials/google-service-account-key.json
+credentials/
 # Logs
 *.log
 npm-debug.log*

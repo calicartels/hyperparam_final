@@ -74,10 +74,12 @@ export default function PopupPage() {
         window.chrome.runtime.openOptionsPage();
       } catch (error) {
         console.error('Failed to open options page:', error);
+        // Fallback for web app
+        window.location.href = '/options';
       }
     } else {
       // In web app mode, redirect to options route
-      window.location.href = '/?page=options';
+      window.location.href = '/options';
     }
   };
   
@@ -129,11 +131,11 @@ export default function PopupPage() {
       } catch (error) {
         console.error('Failed to open detailed analysis:', error);
         // Fallback for web app
-        window.open(`/?param=${param.name}&value=${param.value}&framework=${param.framework}`, '_blank');
+        window.open(`/parameter-details?param=${param.name}&value=${param.value}&framework=${param.framework}`, '_blank');
       }
     } else {
       // In web app mode, open in a new tab
-      window.open(`/?param=${param.name}&value=${param.value}&framework=${param.framework}`, '_blank');
+      window.open(`/parameter-details?param=${param.name}&value=${param.value}&framework=${param.framework}`, '_blank');
     }
   };
   

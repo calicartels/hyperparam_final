@@ -15,13 +15,23 @@ import { Switch } from '@/components/ui/switch';
 import { Tutorial } from '@/components/Tutorial';
 import { useTutorial } from '@/hooks/use-tutorial';
 
-export default function TestAPIPage() {
+interface TestAPIPageProps {
+  initialParam?: string;
+  initialValue?: string;
+  initialFramework?: string;
+}
+
+export default function TestAPIPage({ 
+  initialParam, 
+  initialValue, 
+  initialFramework 
+}: TestAPIPageProps) {
   const [llmStatus, setLlmStatus] = useState<LLMStatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
-  const [paramName, setParamName] = useState('learning_rate');
-  const [paramValue, setParamValue] = useState('0.001');
-  const [framework, setFramework] = useState('tensorflow');
+  const [paramName, setParamName] = useState(initialParam || 'learning_rate');
+  const [paramValue, setParamValue] = useState(initialValue || '0.001');
+  const [framework, setFramework] = useState(initialFramework || 'tensorflow');
   const [codeContext, setCodeContext] = useState(`model = Sequential()
 model.add(Dense(64, activation='relu'))
 model.add(Dense(10, activation='softmax'))

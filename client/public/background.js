@@ -40,6 +40,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     
     return true; // Keep the message channel open for async response
   }
+  
+  // Handle requests to show parameter details in the popup
+  if (message.type === 'showParameterDetails') {
+    // Open the popup with the parameter details
+    const { paramName, paramValue, framework, codeContext } = message;
+    
+    // Open the extension popup with the specific parameter details
+    const queryParams = new URLSearchParams({
+      param: paramName,
+      value: paramValue,
+      framework: framework || 'unknown',
+      source: 'content_script'
+    }).toString();
+    
+    // Use the chrome runtime API to open the popup page
+    const popupUrl = chrome.runtime.getURL(`index.html?${queryParams}`);
+    
+    // Open in a new tab as a fallback
+    chrome.tabs.create({ url: popupUrl });
+    
+    sendResponse({ success: true });
+    return true;
+  }
 });
 
 // Listen for browser action (toolbar icon) clicks

@@ -35,8 +35,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Process all code blocks on the page
 function processCodeBlocks() {
-  // Look for code blocks in various formats (pre, code elements, etc.)
-  const codeElements = document.querySelectorAll('pre code, pre, .code-block, .hljs');
+  // Look for code blocks in various formats, including ChatGPT's code blocks
+  const codeElements = document.querySelectorAll(
+    'pre code, pre, .code-block, .hljs, .markdown code, div[class*="code-block"], .chat-content code, div[data-code-block-mode="multi"], code[class*="language-"]'
+  );
   
   if (codeElements.length === 0) return;
   
@@ -453,6 +455,20 @@ function showParameterDetails(paramKey, paramValue, framework, codeContext) {
   popup.style.padding = '20px';
   popup.style.fontFamily = 'system-ui, -apple-system, sans-serif';
   
+  // Determine impact based on parameter
+  let impact = 'medium';
+  if (['learning_rate', 'lr', 'batch_size', 'optimizer'].includes(paramKey)) {
+    impact = 'high';
+  } else if (['weight_decay', 'momentum'].includes(paramKey)) {
+    impact = 'medium';
+  }
+  
+  const impactColor = {
+    high: '#ef4444',
+    medium: '#f59e0b',
+    low: '#10b981'
+  };
+  
   // Add popup content
   popup.innerHTML = `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -464,7 +480,7 @@ function showParameterDetails(paramKey, paramValue, framework, codeContext) {
         <strong>Current value:</strong> <span style="color: #4F46E5; font-weight: 500;">${paramValue}</span>
       </div>
       <div style="font-size: 14px; color: #666; margin-bottom: 5px;">
-        <strong>Impact:</strong> This parameter has a <span style="color: #ef4444; font-weight: 500;">high impact</span> on model performance.
+        <strong>Impact:</strong> This parameter has a <span style="color: ${impactColor[impact]}; font-weight: 500;">${impact} impact</span> on model performance.
       </div>
       <div style="font-size: 14px; color: #666; margin-bottom: 15px;">
         <strong>Usage in:</strong> ${framework}
@@ -506,8 +522,25 @@ function showParameterDetails(paramKey, paramValue, framework, codeContext) {
   });
   
   document.getElementById('hyperexplainer-learn-more-btn').addEventListener('click', () => {
-    // Open details page in new tab with appropriate query parameters
-    window.open(`${API_ENDPOINT}/?param=${paramKey}&value=${paramValue}&framework=${framework}`, '_blank');
+    // Instead of opening in a new tab, send a message to the background script
+    // This will open the popup with the parameter details
+    const paramData = {
+      type: 'showParameterDetails',
+      paramName: paramKey,
+      paramValue: paramValue,
+      framework: framework,
+      codeContext: codeContext
+    };
+    
+    // Try both methods of communication for compatibility
+    if (chrome && chrome.runtime) {
+      chrome.runtime.sendMessage(paramData, function(response) {
+        console.log('Parameter details opened in popup');
+      });
+    } else {
+      // Fallback to opening in a new tab if message passing fails
+      window.open(`${API_ENDPOINT}/?param=${paramKey}&value=${paramValue}&framework=${framework}`, '_blank');
+    }
     
     // Close popup
     popup.remove();

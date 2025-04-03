@@ -144,23 +144,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Construct the prompt
         const prompt = `
-You are an expert in machine learning, specifically focusing on hyperparameters.
-Provide a detailed explanation of the hyperparameter '${paramName}' with value '${paramValue}'
+You are an expert in machine learning, specifically focusing on model configuration and optimization.
+Provide a detailed explanation of the configurable parameter '${paramName}' with value '${paramValue}'
 ${framework ? `in the ${framework} framework` : ""}.
 
-${codeContext ? `Here is the code context where this hyperparameter appears:\n\`\`\`\n${codeContext}\n\`\`\`\n` : ""}
+${codeContext ? `Here is the code context where this parameter appears:\n\`\`\`\n${codeContext}\n\`\`\`\n` : ""}
+
+This could be any configurable aspect of a machine learning model, including:
+- Traditional hyperparameters (learning rate, batch size, etc.)
+- Model architecture choices (model type, number of layers)
+- Layer configurations (kernel size, filters, strides)
+- Activation functions (ReLU, Sigmoid, etc.)
+- Loss functions (categorical cross-entropy, MSE)
+- Regularization methods (dropout, weight decay)
+- Input/output shapes or dimensions
+- Preprocessing options (normalization, augmentation)
+- Training configurations (callbacks, optimizers)
+- Any other configurable value that affects model behavior
 
 Provide the following information:
-1. A clear definition of the hyperparameter
-2. How this specific value (${paramValue}) impacts model training and performance
+1. A clear definition of the parameter and its role
+2. How this specific value (${paramValue}) impacts the model's behavior and performance
 3. Common alternative values and when they would be appropriate
-4. Best practices for tuning this hyperparameter
-5. Trade-offs to consider when adjusting this hyperparameter
+4. Best practices for configuring this parameter
+5. Trade-offs to consider when adjusting this parameter
 
 Format your response as JSON with the following structure:
 {
-  "name": "Formatted name of the hyperparameter",
-  "description": "Detailed explanation of what the hyperparameter controls",
+  "name": "Formatted name of the parameter",
+  "description": "Detailed explanation of what the parameter controls",
   "impact": "high/medium/low - how much this affects model performance",
   "valueAnalysis": "Analysis of the current value ${paramValue}",
   "alternatives": [
@@ -171,7 +183,7 @@ Format your response as JSON with the following structure:
     },
     ...more alternatives
   ],
-  "bestPractices": "Tips for setting this hyperparameter",
+  "bestPractices": "Tips for setting this parameter",
   "tradeoffs": "Key tradeoffs to consider"
 }
 `;

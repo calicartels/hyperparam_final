@@ -13,7 +13,7 @@ export type HyperparameterInfo = {
   alternatives: Alternative[];
 };
 
-// A comprehensive database of common hyperparameters for ML frameworks
+// A comprehensive database of common hyperparameters and configurable aspects for ML frameworks
 export const hyperparametersDB: Record<string, HyperparameterInfo> = {
   // PyTorch Hyperparameters
   learning_rate: {
@@ -244,10 +244,322 @@ export const hyperparametersDB: Record<string, HyperparameterInfo> = {
       { value: "64", description: "Smaller layer for efficiency", type: "lower" },
       { value: "Powers of 2", description: "Using sizes like 64, 128, 256 for better memory alignment", type: "advanced" }
     ]
+  },
+  
+  // NEW: Model Architecture Choices
+  model_architecture: {
+    name: "Model Architecture",
+    description: "The overall structure and type of machine learning model being used.",
+    impact: "high",
+    framework: "Generic",
+    alternatives: [
+      { value: "Sequential", description: "Simple layer-by-layer architecture for straightforward tasks", type: "advanced" },
+      { value: "Functional API", description: "More flexible architecture allowing complex layer connections", type: "advanced" },
+      { value: "ResNet", description: "Deep CNN with residual connections to avoid vanishing gradients", type: "advanced" },
+      { value: "Transformer", description: "Architecture using self-attention for sequence modeling", type: "advanced" }
+    ]
+  },
+  
+  // NEW: Loss Functions
+  loss_function: {
+    name: "Loss Function",
+    description: "Function that measures how well the model performs during training, to be minimized.",
+    impact: "high",
+    framework: "Generic",
+    alternatives: [
+      { value: "categorical_crossentropy", description: "Standard loss for multi-class classification", type: "advanced" },
+      { value: "binary_crossentropy", description: "Loss for binary classification tasks", type: "advanced" },
+      { value: "mse", description: "Mean Squared Error for regression tasks", type: "advanced" },
+      { value: "custom", description: "Custom-designed loss for specific requirements", type: "extreme" }
+    ]
+  },
+  
+  // NEW: Normalization Parameters
+  normalization_mean: {
+    name: "Normalization Mean",
+    description: "Mean values used for normalizing input data. Often channel-wise means for images.",
+    impact: "medium",
+    framework: "Generic",
+    alternatives: [
+      { value: "[0.485, 0.456, 0.406]", description: "ImageNet standard RGB means", type: "advanced" },
+      { value: "[0.5, 0.5, 0.5]", description: "Simplified normalization to center around zero", type: "advanced" },
+      { value: "Dataset-specific", description: "Calculate means from your specific dataset", type: "advanced" },
+      { value: "None", description: "Skip mean normalization (not recommended)", type: "extreme" }
+    ]
+  },
+  
+  normalization_std: {
+    name: "Normalization Standard Deviation",
+    description: "Standard deviation values used for normalizing input data. Scales the data to improve training.",
+    impact: "medium",
+    framework: "Generic",
+    alternatives: [
+      { value: "[0.229, 0.224, 0.225]", description: "ImageNet standard RGB standard deviations", type: "advanced" },
+      { value: "[0.5, 0.5, 0.5]", description: "Simplified scaling to range of approximately [-1, 1]", type: "advanced" },
+      { value: "Dataset-specific", description: "Calculate standard deviations from your specific dataset", type: "advanced" },
+      { value: "None", description: "Skip standard deviation normalization (not recommended)", type: "extreme" }
+    ]
+  },
+  
+  // NEW: Data Processing
+  dataloader_workers: {
+    name: "DataLoader Workers",
+    description: "Number of subprocesses used for data loading. Affects training speed and CPU usage.",
+    impact: "low",
+    framework: "PyTorch",
+    alternatives: [
+      { value: "4", description: "Balanced choice for most systems", type: "advanced" },
+      { value: "0", description: "No multiprocessing, useful for debugging", type: "lower" },
+      { value: "8", description: "Higher parallelism for systems with many cores", type: "higher" },
+      { value: "num_cpus", description: "Set to number of CPU cores available", type: "advanced" }
+    ]
+  },
+  
+  data_shuffle: {
+    name: "Data Shuffling",
+    description: "Determines whether training data is randomly shuffled between epochs.",
+    impact: "medium",
+    framework: "Generic",
+    alternatives: [
+      { value: "True", description: "Randomizes data order, recommended for most cases", type: "advanced" },
+      { value: "False", description: "Keeps original data order, useful for time series", type: "advanced" },
+      { value: "Custom Sampler", description: "Create custom sampling strategy for imbalanced data", type: "extreme" },
+      { value: "Per-batch shuffle", description: "Only shuffle within batches, not across all data", type: "advanced" }
+    ]
+  },
+  
+  // NEW: Convolutional Network Parameters
+  kernel_size: {
+    name: "Kernel Size",
+    description: "Size of the convolutional filter kernel. Determines the receptive field of the convolution.",
+    impact: "high",
+    framework: "Generic",
+    alternatives: [
+      { value: "3", description: "Standard size for most CNNs, balance of local features", type: "advanced" },
+      { value: "1", description: "Point-wise convolution for channel mixing", type: "lower" },
+      { value: "5", description: "Larger receptive field for broader feature capture", type: "higher" },
+      { value: "Variable sizes", description: "Mix different kernel sizes for multiple feature scales", type: "advanced" }
+    ]
+  },
+  
+  conv_filters: {
+    name: "Convolutional Filters",
+    description: "Number of filters/channels in a convolutional layer. Determines feature extraction capacity.",
+    impact: "high",
+    framework: "Generic",
+    alternatives: [
+      { value: "64", description: "Standard starting point for many architectures", type: "advanced" },
+      { value: "32", description: "Fewer parameters, faster but less expressive", type: "lower" },
+      { value: "128", description: "More features, potentially better recognition", type: "higher" },
+      { value: "Progressive growth", description: "Double filters in deeper layers", type: "advanced" }
+    ]
+  },
+  
+  conv_strides: {
+    name: "Convolution Stride",
+    description: "Step size when sliding the filter over the input. Affects output size and computation.",
+    impact: "medium",
+    framework: "Generic",
+    alternatives: [
+      { value: "1", description: "Standard stride, preserves spatial dimensions", type: "advanced" },
+      { value: "2", description: "Downsamples by factor of 2, reduces computation", type: "advanced" },
+      { value: "(2,2)", description: "Stride in both dimensions, common for downsampling", type: "advanced" },
+      { value: "Dilated", description: "Use dilated convolutions for larger receptive field", type: "extreme" }
+    ]
+  },
+  
+  padding_type: {
+    name: "Padding Type",
+    description: "How the input is padded before convolution. Affects output size and edge treatment.",
+    impact: "medium",
+    framework: "Generic",
+    alternatives: [
+      { value: "same", description: "Output size same as input, padding as needed", type: "advanced" },
+      { value: "valid", description: "No padding, output size reduced", type: "advanced" },
+      { value: "causal", description: "Padding only on one side, for causal convolutions", type: "advanced" },
+      { value: "reflect", description: "Reflection padding for better edge handling", type: "extreme" }
+    ]
+  },
+  
+  // NEW: Pooling Operations
+  pool_size: {
+    name: "Pooling Size",
+    description: "Size of the window for pooling operations. Affects downsampling rate.",
+    impact: "medium",
+    framework: "Generic",
+    alternatives: [
+      { value: "2", description: "Standard pooling, halves dimensions", type: "advanced" },
+      { value: "3", description: "Larger pooling, more aggressive downsampling", type: "higher" },
+      { value: "Global", description: "Global pooling across entire feature map", type: "extreme" },
+      { value: "Spatial Pyramid", description: "Multiple pooling sizes for multi-scale features", type: "advanced" }
+    ]
+  },
+  
+  // NEW: Regularization Methods
+  l1_regularization: {
+    name: "L1 Regularization",
+    description: "Adds penalty proportional to the absolute value of weights, promoting sparsity.",
+    impact: "medium",
+    framework: "Generic",
+    alternatives: [
+      { value: "0.01", description: "Moderate sparsity encouragement", type: "advanced" },
+      { value: "0.001", description: "Lighter regularization effect", type: "lower" },
+      { value: "0.1", description: "Strong sparsity encouragement", type: "higher" },
+      { value: "0", description: "No L1 regularization", type: "extreme" }
+    ]
+  },
+  
+  activity_regularization: {
+    name: "Activity Regularization",
+    description: "Applies regularization to the output of the layer instead of weights.",
+    impact: "medium",
+    framework: "Generic",
+    alternatives: [
+      { value: "l1", description: "Sparsity in activations, encourages focused features", type: "advanced" },
+      { value: "l2", description: "Stabilizes activations, prevents extreme values", type: "advanced" },
+      { value: "l1_l2", description: "Combined L1 and L2 regularization on activations", type: "advanced" },
+      { value: "None", description: "No activity regularization", type: "extreme" }
+    ]
+  },
+  
+  // NEW: RNN Parameters
+  rnn_return_sequences: {
+    name: "Return Sequences",
+    description: "Whether RNN layer should return output for each time step or just the final output.",
+    impact: "high",
+    framework: "Generic",
+    alternatives: [
+      { value: "True", description: "Return output for each time step, for sequence tasks", type: "advanced" },
+      { value: "False", description: "Return only final output, for classification tasks", type: "advanced" },
+      { value: "Mixed approach", description: "Some layers return sequences, others don't", type: "advanced" },
+      { value: "Attention over sequences", description: "Return sequences with attention mechanism", type: "extreme" }
+    ]
+  },
+  
+  bidirectional: {
+    name: "Bidirectional RNN",
+    description: "Whether RNN processes sequence in both forward and backward directions.",
+    impact: "high",
+    framework: "Generic",
+    alternatives: [
+      { value: "True", description: "Process in both directions, better for context", type: "advanced" },
+      { value: "False", description: "Process only forward, for causal or streaming data", type: "advanced" },
+      { value: "Stacked unidirectional", description: "Stack multiple unidirectional layers", type: "advanced" },
+      { value: "Mixed layers", description: "Some layers bidirectional, others not", type: "advanced" }
+    ]
+  },
+  
+  // NEW: Attention Mechanisms
+  attention_dropout: {
+    name: "Attention Dropout",
+    description: "Dropout rate applied to attention weights in transformer models.",
+    impact: "medium",
+    framework: "Transformers",
+    alternatives: [
+      { value: "0.1", description: "Standard rate for most transformer models", type: "advanced" },
+      { value: "0.2", description: "Higher dropout for stronger regularization", type: "higher" },
+      { value: "0.0", description: "No dropout, may overfit on smaller datasets", type: "extreme" },
+      { value: "Scheduled", description: "Vary dropout rate during training", type: "advanced" }
+    ]
+  },
+  
+  num_attention_layers: {
+    name: "Number of Attention Layers",
+    description: "Number of attention/transformer blocks stacked in the model.",
+    impact: "high",
+    framework: "Transformers",
+    alternatives: [
+      { value: "6", description: "Standard for medium-sized transformers", type: "advanced" },
+      { value: "12", description: "Deeper model for more complex relationships", type: "higher" },
+      { value: "3", description: "Lightweight model for simpler tasks", type: "lower" },
+      { value: "Progressive depth", description: "Vary layer depth across model sections", type: "advanced" }
+    ]
+  },
+  
+  // NEW: Output Configuration
+  num_classes: {
+    name: "Number of Classes",
+    description: "Number of output classes for classification tasks.",
+    impact: "high",
+    framework: "Generic",
+    alternatives: [
+      { value: "Dataset-specific", description: "Must match your specific dataset classes", type: "advanced" },
+      { value: "1", description: "For binary classification with sigmoid output", type: "advanced" },
+      { value: "Hierarchical classes", description: "Organize classes in hierarchy", type: "extreme" },
+      { value: "Multi-label", description: "Allow multiple classes per sample", type: "advanced" }
+    ]
+  },
+  
+  // NEW: Training Controls
+  early_stopping_patience: {
+    name: "Early Stopping Patience",
+    description: "Number of epochs with no improvement after which training will stop.",
+    impact: "medium",
+    framework: "Generic",
+    alternatives: [
+      { value: "10", description: "Standard patience period for most models", type: "advanced" },
+      { value: "5", description: "Shorter patience for faster training", type: "lower" },
+      { value: "20", description: "Longer patience for more training time", type: "higher" },
+      { value: "Adaptive", description: "Adjust patience based on improvement rate", type: "extreme" }
+    ]
+  },
+  
+  lr_reduction_factor: {
+    name: "Learning Rate Reduction Factor",
+    description: "Factor by which learning rate is reduced on plateau in adaptive schedules.",
+    impact: "medium",
+    framework: "Generic",
+    alternatives: [
+      { value: "0.1", description: "Standard reduction (10x smaller)", type: "advanced" },
+      { value: "0.5", description: "More gradual reduction (2x smaller)", type: "higher" },
+      { value: "0.01", description: "Aggressive reduction (100x smaller)", type: "lower" },
+      { value: "Custom schedule", description: "Design custom LR reduction schedule", type: "extreme" }
+    ]
+  },
+  
+  // NEW: Transfer Learning
+  feature_extraction: {
+    name: "Feature Extraction",
+    description: "Using pre-trained model for feature extraction by freezing early layers.",
+    impact: "high",
+    framework: "Generic",
+    alternatives: [
+      { value: "True", description: "Freeze base model, train only new layers", type: "advanced" },
+      { value: "False", description: "Fine-tune entire model", type: "advanced" },
+      { value: "Progressive unfreezing", description: "Gradually unfreeze layers during training", type: "advanced" },
+      { value: "Discriminative LR", description: "Different learning rates for different layers", type: "extreme" }
+    ]
+  },
+  
+  // NEW: Batch Normalization
+  batch_norm_momentum: {
+    name: "Batch Normalization Momentum",
+    description: "Momentum for the moving average in batch normalization layers.",
+    impact: "medium",
+    framework: "Generic",
+    alternatives: [
+      { value: "0.99", description: "Standard momentum, stable statistics", type: "advanced" },
+      { value: "0.9", description: "More responsive to recent batches", type: "lower" },
+      { value: "0.999", description: "More stable long-term statistics", type: "higher" },
+      { value: "Scheduled", description: "Adjust momentum during training", type: "extreme" }
+    ]
+  },
+  
+  batch_norm_epsilon: {
+    name: "Batch Normalization Epsilon",
+    description: "Small constant added to variance to prevent division by zero.",
+    impact: "low",
+    framework: "Generic",
+    alternatives: [
+      { value: "1e-5", description: "Standard epsilon for most models", type: "advanced" },
+      { value: "1e-3", description: "Larger epsilon for more stable training", type: "higher" },
+      { value: "1e-7", description: "Smaller epsilon for more precise normalization", type: "lower" },
+      { value: "Adaptive", description: "Adjust epsilon based on batch statistics", type: "extreme" }
+    ]
   }
 };
 
-// Regex patterns to identify hyperparameters in various frameworks
+// Regex patterns to identify hyperparameters and configurable aspects in various frameworks
 export const hyperparameterPatterns = [
   // Optimizer learning rates
   { regex: /lr\s*=\s*([\d.]+)/, key: "learning_rate" },
@@ -284,6 +596,8 @@ export const hyperparameterPatterns = [
   // Optimizers
   { regex: /optimizer\s*=\s*['"]?(\w+)['"]?/, key: "optimizer" },
   { regex: /Optimizer\(\s*['"]?(\w+)['"]?/, key: "optimizer" },
+  { regex: /optimizer\.(\w+)\(/, key: "optimizer" }, // PyTorch optimizers
+  { regex: /tf\.keras\.optimizers\.(\w+)\(/, key: "optimizer" }, // TF optimizers
   
   // scikit-learn specific
   { regex: /n_estimators\s*=\s*(\d+)/, key: "n_estimators" },
@@ -307,9 +621,90 @@ export const hyperparameterPatterns = [
   { regex: /hidden_size\s*=\s*(\d+)/, key: "hidden_size" },
   { regex: /hidden_dim\s*=\s*(\d+)/, key: "hidden_size" },
   { regex: /hidden_units\s*=\s*(\d+)/, key: "hidden_size" },
+  
+  // NEW: Model architecture choices
+  { regex: /model\s*=\s*(\w+)/, key: "model_architecture" },
+  { regex: /model_type\s*=\s*['"]?(\w+)['"]?/, key: "model_architecture" },
+  { regex: /architecture\s*=\s*['"]?(\w+)['"]?/, key: "model_architecture" },
+  { regex: /Sequential\(\[/, key: "model_architecture", value: "Sequential" }, // Detect Sequential models
+  { regex: /class\s+(\w+Model)\(/, key: "model_architecture" }, // Custom model classes
+  { regex: /models\.(\w+)\(/, key: "model_architecture" }, // Pre-built models like ResNet, etc.
+  
+  // NEW: Activation functions
+  { regex: /activation\s*=\s*['"]?(\w+)['"]?/, key: "activation_function" },
+  { regex: /activation_fn\s*=\s*['"]?(\w+)['"]?/, key: "activation_function" },
+  { regex: /nn\.(\w+)\(/, key: "activation_function" }, // PyTorch activations
+  { regex: /tf\.nn\.(\w+)/, key: "activation_function" }, // TensorFlow activations
+  
+  // NEW: Loss functions
+  { regex: /loss\s*=\s*['"]?(\w+)['"]?/, key: "loss_function" },
+  { regex: /loss_fn\s*=\s*(\w+)/, key: "loss_function" },
+  { regex: /criterion\s*=\s*nn\.(\w+)/, key: "loss_function" }, // PyTorch losses
+  { regex: /tf\.keras\.losses\.(\w+)/, key: "loss_function" }, // TF losses
+  
+  // NEW: Data preprocessing
+  { regex: /mean\s*=\s*\[([^\]]+)\]/, key: "normalization_mean" },
+  { regex: /std\s*=\s*\[([^\]]+)\]/, key: "normalization_std" },
+  { regex: /num_workers\s*=\s*(\d+)/, key: "dataloader_workers" },
+  { regex: /shuffle\s*=\s*(True|False)/, key: "data_shuffle" },
+  
+  // NEW: Layer configurations
+  { regex: /kernel_size\s*=\s*(\d+|\(\d+,\s*\d+\))/, key: "kernel_size" },
+  { regex: /filters\s*=\s*(\d+)/, key: "conv_filters" },
+  { regex: /out_channels\s*=\s*(\d+)/, key: "conv_filters" }, // PyTorch equivalent
+  { regex: /strides\s*=\s*(\d+|\(\d+,\s*\d+\))/, key: "conv_strides" },
+  { regex: /stride\s*=\s*(\d+|\(\d+,\s*\d+\))/, key: "conv_strides" }, // PyTorch version
+  { regex: /padding\s*=\s*['"]?(\w+|\d+)['"]?/, key: "padding_type" },
+  
+  // NEW: Pooling operations
+  { regex: /pool_size\s*=\s*(\d+|\(\d+,\s*\d+\))/, key: "pool_size" },
+  { regex: /MaxPool\w*\((\d+)/, key: "pool_size" }, // MaxPool with kernel size
+  { regex: /AvgPool\w*\((\d+)/, key: "pool_size" }, // AvgPool with kernel size
+  
+  // NEW: Regularization methods
+  { regex: /regularizers\.l1_l2\(l1\s*=\s*([\d.]+)/, key: "l1_regularization" },
+  { regex: /regularizers\.l1\(([\d.]+)/, key: "l1_regularization" },
+  { regex: /activity_regularizer\s*=\s*(\w+)/, key: "activity_regularization" },
+  
+  // NEW: Recurrent networks specific
+  { regex: /return_sequences\s*=\s*(True|False)/, key: "rnn_return_sequences" },
+  { regex: /bidirectional\s*=\s*(True|False)/, key: "bidirectional" },
+  { regex: /Bidirectional\(/, key: "bidirectional", value: "True" },
+  { regex: /stateful\s*=\s*(True|False)/, key: "rnn_stateful" },
+  
+  // NEW: Attention mechanisms
+  { regex: /attention_probs_dropout_prob\s*=\s*([\d.]+)/, key: "attention_dropout" },
+  { regex: /MultiheadAttention\([\s\S]*?dropout\s*=\s*([\d.]+)/, key: "attention_dropout" },
+  { regex: /num_attention_layers\s*=\s*(\d+)/, key: "num_attention_layers" },
+  
+  // NEW: Input/output shapes
+  { regex: /input_shape\s*=\s*\(([^\)]+)\)/, key: "input_shape" },
+  { regex: /output_dim\s*=\s*(\d+)/, key: "output_dim" },
+  { regex: /num_classes\s*=\s*(\d+)/, key: "num_classes" },
+  { regex: /output_classes\s*=\s*(\d+)/, key: "num_classes" },
+  
+  // NEW: Callbacks and training configurations
+  { regex: /EarlyStopping\([\s\S]*?patience\s*=\s*(\d+)/, key: "early_stopping_patience" },
+  { regex: /patience\s*=\s*(\d+)/, key: "patience" },
+  { regex: /ReduceLROnPlateau\([\s\S]*?factor\s*=\s*([\d.]+)/, key: "lr_reduction_factor" },
+  { regex: /ModelCheckpoint\(/, key: "model_checkpointing", value: "True" },
+  
+  // NEW: Gradient handling
+  { regex: /clip_grad_norm_\([\s\S]*?([\d.]+)/, key: "gradient_clipping" },
+  { regex: /gradient_accumulation_steps\s*=\s*(\d+)/, key: "gradient_accumulation" },
+  
+  // NEW: Transfer learning
+  { regex: /freeze\(/, key: "feature_extraction", value: "True" },
+  { regex: /trainable\s*=\s*(True|False)/, key: "layer_trainable" },
+  { regex: /requires_grad\s*=\s*(True|False)/, key: "requires_grad" },
+  
+  // NEW: Batch normalization
+  { regex: /BatchNormalization\([\s\S]*?momentum\s*=\s*([\d.]+)/, key: "batch_norm_momentum" },
+  { regex: /eps\s*=\s*([\d.]+)/, key: "batch_norm_epsilon" },
+  { regex: /track_running_stats\s*=\s*(True|False)/, key: "track_stats" },
 ];
 
-// Function to identify hyperparameters in code
+// Function to identify all configurable aspects (hyperparameters and other choices) in code
 export const identifyHyperparameters = (code: string): { 
   key: string;
   value: string;
@@ -322,7 +717,8 @@ export const identifyHyperparameters = (code: string): {
     const regex = new RegExp(pattern.regex, 'g');
     
     while ((match = regex.exec(code)) !== null) {
-      const value = match[1];
+      // Use the captured value from regex, or the fixed value if provided in the pattern
+      const value = pattern.value !== undefined ? pattern.value : match[1];
       const start = match.index;
       const end = match.index + match[0].length;
       

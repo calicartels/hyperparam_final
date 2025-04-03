@@ -35,31 +35,42 @@ interface HyperparameterDetectionResult {
 }
 
 /**
- * Detect hyperparameters in code using deep learning
+ * Detect hyperparameters and all configurable aspects in code using deep learning
  * 
- * This function uses the Gemini LLM to analyze code and identify hyperparameters
- * with their values, likely framework, and importance.
+ * This function uses the Gemini LLM to analyze code and identify all configurable aspects
+ * (hyperparameters, model choices, layer configurations, etc.) with their values,
+ * likely framework, and importance.
  * 
  * @param code The code to analyze
- * @returns Promise with detected hyperparameters
+ * @returns Promise with detected parameters
  */
 export async function detectHyperparametersWithAI(code: string): Promise<HyperparameterDetectionResult> {
   try {
     const prompt = `
-You are an expert machine learning engineer specializing in hyperparameter optimization.
-Please analyze the following code and identify all hyperparameters with their values.
+You are an expert machine learning engineer specializing in code analysis and optimization.
+Please analyze the following code and identify ALL configurable aspects, including:
+1. Traditional hyperparameters (learning rate, batch size, etc.)
+2. Model architecture choices (model type, architecture)
+3. Layer configurations (kernel size, filters, strides, padding)
+4. Activation functions
+5. Loss functions
+6. Regularization methods
+7. Input/output shapes
+8. Data preprocessing options
+9. Callbacks and training configurations
+10. Any other parameters that could be modified to change model behavior
 
 CODE:
 \`\`\`
 ${code}
 \`\`\`
 
-For each hyperparameter found, provide:
-1. The parameter name
-2. The parameter value
+For each configurable aspect found, provide:
+1. The parameter name (use snake_case format)
+2. The parameter value (as it appears in the code)
 3. The framework it belongs to (e.g., tensorflow, pytorch, scikit-learn, etc.)
 4. The impact level (high, medium, or low)
-5. A brief explanation of its purpose
+5. A brief explanation of its purpose and how it affects the model
 
 Return your response in JSON format with the following structure:
 {
@@ -75,6 +86,7 @@ Return your response in JSON format with the following structure:
   ]
 }
 
+Be comprehensive and thorough. Identify ALL configurable aspects, not just traditional hyperparameters.
 Do not include any other text besides the JSON response.
 `;
 
@@ -122,9 +134,9 @@ Do not include any other text besides the JSON response.
 }
 
 /**
- * Get alternative hyperparameter suggestions using AI
+ * Get alternative suggestions for any configurable aspect using AI
  * 
- * @param paramName Hyperparameter name
+ * @param paramName Parameter name (can be hyperparameter, model choice, layer config, etc.)
  * @param paramValue Current value
  * @param framework Framework name
  * @returns Promise with alternative suggestions
@@ -136,14 +148,30 @@ export async function getAlternativeHyperparameters(
 ): Promise<any> {
   try {
     const prompt = `
-You are an expert machine learning engineer specializing in hyperparameter optimization.
-Suggest alternative values for the "${paramName}" hyperparameter (current value: ${paramValue}) 
+You are an expert machine learning engineer specializing in model optimization.
+Suggest alternative values for the "${paramName}" parameter (current value: ${paramValue}) 
 in the ${framework} framework.
 
+The parameter could be any configurable aspect of a machine learning model, including:
+- Traditional hyperparameters (learning rate, batch size, etc.)
+- Model architecture choices
+- Layer configurations
+- Activation functions
+- Loss functions
+- Regularization settings
+- Input/output configurations
+- Optimization algorithms
+- Data preprocessing options
+- Any other configurable value that affects model behavior
+
 For each suggested alternative, provide:
-1. The alternative value
-2. A brief explanation of why this might be better
-3. The type of change (higher, lower, advanced)
+1. The alternative value (be specific and use correct syntax)
+2. A brief explanation of why this might be better and how it affects model behavior
+3. The type of change (higher, lower, advanced, extreme)
+   - "higher": for increasing numeric values
+   - "lower": for decreasing numeric values
+   - "advanced": for different but common options
+   - "extreme": for unusual or experimental options
 
 Return your response in JSON format with the following structure:
 {
@@ -157,6 +185,7 @@ Return your response in JSON format with the following structure:
   ]
 }
 
+Provide 3-4 meaningful alternatives that represent different approaches or strategies.
 Do not include any other text besides the JSON response.
 `;
 

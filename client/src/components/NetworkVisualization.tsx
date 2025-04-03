@@ -20,7 +20,7 @@ export function NetworkVisualization({
   const [selectedValue, setSelectedValue] = useState<number>(parseFloat(paramValue) || 0);
   const [networkType, setNetworkType] = useState<string>("dense");
   const [animationFrame, setAnimationFrame] = useState<number | null>(null);
-  const [showAnimation, setShowAnimation] = useState(false);
+  const [showAnimation, setShowAnimation] = useState(true); // Start with animation enabled by default
   
   const getValueRange = () => {
     if (paramName.includes('learning_rate') || paramName.includes('lr')) {
@@ -149,7 +149,7 @@ export function NetworkVisualization({
       return;
     }
     
-    // For animation, set up an animation loop
+    // For animation, set up an animation loop with SLOWER speed
     let lastTimestamp = 0;
     
     const animateNetwork = (timestamp: number) => {
@@ -161,8 +161,9 @@ export function NetworkVisualization({
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      // Draw the network with animation
-      drawNeuralNetwork(ctx, canvas, params, networkType, true, timestamp / 1000);
+      // Draw the network with animation - use a much slower time factor (divide by 5000 instead of 1000)
+      // This makes the animation approximately 5x slower
+      drawNeuralNetwork(ctx, canvas, params, networkType, true, timestamp / 5000);
       
       // Continue animation loop
       const frame = requestAnimationFrame(animateNetwork);
@@ -238,7 +239,7 @@ export function NetworkVisualization({
               variant={showAnimation ? "default" : "outline"} 
               onClick={toggleAnimation}
             >
-              {showAnimation ? "Stop Animation" : "Animate"}
+              {showAnimation ? "Pause Animation" : "Resume Animation"}
             </Button>
           </div>
           <Slider
@@ -253,8 +254,44 @@ export function NetworkVisualization({
         </div>
         
         <div className="mt-4 text-sm text-gray-600">
-          <p>This visualization shows how changing the <strong>{paramName}</strong> affects the neural network architecture and behavior.</p>
-          <p className="mt-1 text-xs text-gray-500">Note: This is a simplified representation for educational purposes.</p>
+          {paramName.includes('learning_rate') && (
+            <>
+              <p>This visualization shows how <strong>{paramName}</strong> affects signal propagation through the network:</p>
+              <ul className="list-disc list-inside mt-2 text-xs space-y-1">
+                <li>Higher learning rates (values like 0.01) show as brighter, more intense connections</li>
+                <li>Lower learning rates (values like 0.0001) show as more subtle, controlled signal flow</li>
+                <li>The animation demonstrates how signals transmit at different speeds based on learning rate</li>
+              </ul>
+            </>
+          )}
+          
+          {paramName.includes('dropout') && (
+            <>
+              <p>This visualization shows how <strong>{paramName}</strong> affects neural network training:</p>
+              <ul className="list-disc list-inside mt-2 text-xs space-y-1">
+                <li>Inactive neurons (marked with X) demonstrate the dropout effect</li>
+                <li>Higher dropout rates disable more neurons during training</li>
+                <li>The animation shows the changing pattern of active neurons during training</li>
+              </ul>
+            </>
+          )}
+          
+          {paramName.includes('batch_size') && (
+            <>
+              <p>This visualization shows how <strong>{paramName}</strong> affects network training:</p>
+              <ul className="list-disc list-inside mt-2 text-xs space-y-1">
+                <li>Larger batch sizes allow the network to process more examples at once</li>
+                <li>The number of active neurons corresponds to batch size capacity</li>
+                <li>The animation demonstrates parallel processing patterns</li>
+              </ul>
+            </>
+          )}
+          
+          {(!paramName.includes('learning_rate') && !paramName.includes('dropout') && !paramName.includes('batch_size')) && (
+            <p>This visualization shows how changing the <strong>{paramName}</strong> affects the neural network architecture and behavior.</p>
+          )}
+          
+          <p className="mt-2 text-xs text-gray-500">The animation runs at a slower, educational pace. You can pause it anytime for a closer look.</p>
         </div>
       </CardContent>
     </Card>

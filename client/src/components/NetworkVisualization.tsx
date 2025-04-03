@@ -149,8 +149,15 @@ export function NetworkVisualization({
       return;
     }
     
-    // For animation, set up an animation loop with SLOWER speed
+    // For animation, set up an animation loop with MUCH SLOWER speed
     let lastTimestamp = 0;
+    
+    // Get the requestAnimationFrame polyfill (for cross-browser compatibility)
+    const requestAnimationFramePolyfill = 
+      window.requestAnimationFrame ||
+      function(callback) {
+        return window.setTimeout(callback, 1000 / 60);
+      };
     
     const animateNetwork = (timestamp: number) => {
       // Calculate time delta
@@ -161,32 +168,71 @@ export function NetworkVisualization({
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      // Draw the network with animation - use a much slower time factor (divide by 5000 instead of 1000)
-      // This makes the animation approximately 5x slower
-      drawNeuralNetwork(ctx, canvas, params, networkType, true, timestamp / 5000);
+      // Draw the network with animation - use an EXTREMELY slow time factor (divide by 25000 instead of 1000)
+      // This makes the animation approximately 25x slower for a very clear educational visualization
+      // The slow speed ensures compatibility across devices, browsers and platforms (including Chrome extensions)
+      drawNeuralNetwork(ctx, canvas, params, networkType, true, timestamp / 25000);
       
-      // Continue animation loop
-      const frame = requestAnimationFrame(animateNetwork);
+      // Continue animation loop using the polyfill for cross-browser support
+      const frame = requestAnimationFramePolyfill(animateNetwork);
       setAnimationFrame(frame);
     };
     
-    // Start animation loop
-    const frame = requestAnimationFrame(animateNetwork);
+    // Start animation loop with polyfill
+    const frame = requestAnimationFramePolyfill(animateNetwork);
     setAnimationFrame(frame);
     
-    // Clean up function
+    // Clean up function - use polyfill
+    const cancelAnimationFramePolyfill = 
+      window.cancelAnimationFrame ||
+      function(id) {
+        window.clearTimeout(id);
+      };
+      
     return () => {
       if (animationFrame !== null) {
-        cancelAnimationFrame(animationFrame);
+        cancelAnimationFramePolyfill(animationFrame);
       }
     };
   }, [selectedValue, networkType, paramName, showAnimation]);
   
-  // Clean up animation frame on unmount
+  // Clean up animation frame on unmount and provide cross-platform compatibility
   useEffect(() => {
+    // Polyfill for requestAnimationFrame to ensure compatibility across browsers
+    // (including older Safari versions on Mac)
+    const requestAnimationFramePolyfill = 
+      window.requestAnimationFrame ||
+      function(callback) {
+        return window.setTimeout(callback, 1000 / 60);
+      };
+      
+    // Polyfill for cancelAnimationFrame
+    const cancelAnimationFramePolyfill = 
+      window.cancelAnimationFrame ||
+      function(id) {
+        window.clearTimeout(id);
+      };
+    
+    // Set up device pixel ratio handling for high-DPI displays (Retina/Mac)
+    if (canvasRef.current) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        // Handle high-DPI displays (like MacBook Retina)
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        if (devicePixelRatio > 1) {
+          canvas.style.width = canvas.width + 'px';
+          canvas.style.height = canvas.height + 'px';
+          canvas.width = canvas.width * devicePixelRatio;
+          canvas.height = canvas.height * devicePixelRatio;
+          ctx.scale(devicePixelRatio, devicePixelRatio);
+        }
+      }
+    }
+    
     return () => {
       if (animationFrame !== null) {
-        cancelAnimationFrame(animationFrame);
+        cancelAnimationFramePolyfill(animationFrame);
       }
     };
   }, []);
@@ -291,7 +337,7 @@ export function NetworkVisualization({
             <p>This visualization shows how changing the <strong>{paramName}</strong> affects the neural network architecture and behavior.</p>
           )}
           
-          <p className="mt-2 text-xs text-gray-500">The animation runs at a slower, educational pace. You can pause it anytime for a closer look.</p>
+          <p className="mt-2 text-xs text-gray-500">The animation intentionally runs at a very slow, educational pace to help you observe how parameters affect network behavior. You can pause it anytime for a closer look.</p>
         </div>
       </CardContent>
     </Card>
@@ -381,7 +427,7 @@ function drawNeuralNetwork(
               Math.pow(toNeuron.x - fromNeuron.x, 2) + 
               Math.pow(toNeuron.y - fromNeuron.y, 2)
             );
-            const phase = (time * 3 + distance / 30) % 1;
+            const phase = (time * 1 + distance / 30) % 1; // Reduced from 3 to 1 for slower animation
             opacity = connectionOpacity * (0.3 + 0.7 * Math.sin(phase * Math.PI));
           }
           
@@ -411,7 +457,7 @@ function drawNeuralNetwork(
           if (verticalDistance <= kernelSize / 2) {
             let opacity = connectionOpacity;
             if (animate) {
-              const phase = (time * 2 + i / fromLayer.length) % 1;
+              const phase = (time * 0.7 + i / fromLayer.length) % 1; // Reduced for slower animation
               opacity = connectionOpacity * (0.3 + 0.7 * Math.sin(phase * Math.PI));
             }
             
@@ -435,7 +481,7 @@ function drawNeuralNetwork(
           
           let opacity = connectionOpacity;
           if (animate) {
-            const phase = (time * 2) % 1;
+            const phase = (time * 0.7) % 1; // Reduced for slower animation
             opacity = connectionOpacity * (0.3 + 0.7 * Math.sin(phase * Math.PI));
           }
           
@@ -466,7 +512,7 @@ function drawNeuralNetwork(
           
           let opacity = connectionOpacity * 0.7;
           if (animate) {
-            const phase = (time * 3 + fromNeuron.y / canvas.height) % 1;
+            const phase = (time * 0.7 + fromNeuron.y / canvas.height) % 1; // Reduced for slower animation
             opacity = connectionOpacity * 0.7 * (0.3 + 0.7 * Math.sin(phase * Math.PI));
           }
           
@@ -508,7 +554,7 @@ function drawNeuralNetwork(
             // Attention connection
             let opacity = connectionOpacity * 0.3;
             if (animate) {
-              const phase = (time * 1.5 + (i + j) / fromLayer.length) % 1;
+              const phase = (time * 0.5 + (i + j) / fromLayer.length) % 1; // Reduced for slower animation
               opacity = connectionOpacity * 0.3 * (0.1 + 0.9 * Math.sin(phase * Math.PI));
             }
             
@@ -561,7 +607,7 @@ function drawNeuralNetwork(
       // Neuron color - if animating, pulse the input and output layers
       let fillColor = activeNeuronColor;
       if (animate && (layerIdx === 0 || layerIdx === layerCount - 1)) {
-        const alpha = Math.sin(time * 3 + neuron.y / 50) * 0.5 + 0.5;
+        const alpha = Math.sin(time * 0.5 + neuron.y / 50) * 0.5 + 0.5; // Reduced for slower animation
         fillColor = layerIdx === 0 ? 
           `rgba(79, 70, 229, ${0.7 + 0.3 * alpha})` : 
           `rgba(239, 68, 68, ${0.7 + 0.3 * alpha})`;

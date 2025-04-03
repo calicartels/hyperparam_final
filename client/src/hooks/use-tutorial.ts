@@ -1,35 +1,48 @@
 import { useState, useEffect } from 'react';
 
-const TUTORIAL_SHOWN_KEY = 'hyperexplainer-tutorial-shown';
+// Local storage key for tutorial state
+const TUTORIAL_STORAGE_KEY = 'hyperexplainer_tutorial_completed';
 
 export function useTutorial() {
+  // State to track if tutorial has been shown
+  const [shouldShowTutorial, setShouldShowTutorial] = useState(false);
   const [isTutorialVisible, setIsTutorialVisible] = useState(false);
-  const [hasSeenTutorial, setHasSeenTutorial] = useState(true); // Default to true until we check storage
+  const [tutorialLoaded, setTutorialLoaded] = useState(false);
 
+  // Load tutorial state on initial mount
   useEffect(() => {
-    // Check if the tutorial has been shown before
-    const tutorialShown = localStorage.getItem(TUTORIAL_SHOWN_KEY);
-    if (tutorialShown !== 'true') {
-      setHasSeenTutorial(false);
-      setIsTutorialVisible(true);
-    }
+    const hasCompletedTutorial = localStorage.getItem(TUTORIAL_STORAGE_KEY) === 'true';
+    setShouldShowTutorial(!hasCompletedTutorial);
+    setTutorialLoaded(true);
   }, []);
 
+  // Show tutorial when appropriate (only after loaded and if not previously completed)
+  useEffect(() => {
+    if (tutorialLoaded && shouldShowTutorial) {
+      // Small delay to show tutorial after component mounts
+      const timer = setTimeout(() => {
+        setIsTutorialVisible(true);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [tutorialLoaded, shouldShowTutorial]);
+
   const completeTutorial = () => {
-    localStorage.setItem(TUTORIAL_SHOWN_KEY, 'true');
-    setHasSeenTutorial(true);
+    localStorage.setItem(TUTORIAL_STORAGE_KEY, 'true');
+    setShouldShowTutorial(false);
     setIsTutorialVisible(false);
   };
 
   const dismissTutorial = () => {
-    localStorage.setItem(TUTORIAL_SHOWN_KEY, 'true');
-    setHasSeenTutorial(true);
+    localStorage.setItem(TUTORIAL_STORAGE_KEY, 'true');
+    setShouldShowTutorial(false);
     setIsTutorialVisible(false);
   };
 
   const resetTutorial = () => {
-    localStorage.removeItem(TUTORIAL_SHOWN_KEY);
-    setHasSeenTutorial(false);
+    localStorage.removeItem(TUTORIAL_STORAGE_KEY);
+    setShouldShowTutorial(true);
     setIsTutorialVisible(true);
   };
 
@@ -37,17 +50,11 @@ export function useTutorial() {
     setIsTutorialVisible(true);
   };
 
-  const hideTutorial = () => {
-    setIsTutorialVisible(false);
-  };
-
   return {
     isTutorialVisible,
-    hasSeenTutorial,
     completeTutorial,
     dismissTutorial,
     resetTutorial,
-    showTutorial,
-    hideTutorial
+    showTutorial
   };
 }

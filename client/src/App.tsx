@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import PopupPage from "@/pages/PopupPage";
 import OptionsPage from "@/pages/OptionsPage";
 import TestAPIPage from "@/pages/TestAPIPage";
+import { HyperparameterPlayground } from "@/components/HyperparameterPlayground";
 
 // Parameter Details wrapper component
 function ParameterDetails() {
@@ -67,6 +68,9 @@ function Router() {
             <Link href="/test-api">
               <span className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">Test API</span>
             </Link>
+            <Link href="/playground">
+              <span className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">Playground</span>
+            </Link>
           </div>
         </nav>
       )}
@@ -80,6 +84,9 @@ function Router() {
         </Route>
         <Route path="/test-api">
           {() => <TestAPIPage />}
+        </Route>
+        <Route path="/playground">
+          {() => <div className="container mx-auto p-4 max-w-6xl"><HyperparameterPlayground /></div>}
         </Route>
         <Route path="/parameter-details">
           {() => {

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, Info, AlertCircle } from 'lucide-react';
+import { ArrowRight, Info, AlertCircle, HelpCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Tutorial } from '@/components/Tutorial';
+import { useTutorial } from '@/hooks/use-tutorial';
 
 // Helper to safely check if we're in a Chrome extension environment
 const isChromeExtension = typeof window !== 'undefined' && 
@@ -21,6 +23,7 @@ export default function PopupPage() {
   const [hyperparameters, setHyperparameters] = useState<Hyperparameter[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentFrameworks, setCurrentFrameworks] = useState<string[]>([]);
+  const { isTutorialVisible, completeTutorial, dismissTutorial, resetTutorial, showTutorial } = useTutorial();
   
   // Get hyperparameters from background script on mount
   useEffect(() => {
@@ -160,9 +163,29 @@ export default function PopupPage() {
   
   return (
     <div className="p-4 w-full max-w-sm">
-      <h1 className="text-xl font-bold mb-1 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-        HyperExplainer
-      </h1>
+      {/* Tutorial Overlay */}
+      {isTutorialVisible && (
+        <Tutorial
+          onComplete={completeTutorial}
+          onDismiss={dismissTutorial}
+          isVisible={isTutorialVisible}
+        />
+      )}
+      
+      <div className="flex justify-between items-center">
+        <h1 className="text-xl font-bold mb-1 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          HyperExplainer
+        </h1>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="p-1 h-8 w-8" 
+          onClick={showTutorial}
+          title="Show tutorial"
+        >
+          <HelpCircle size={16} className="text-gray-400 hover:text-indigo-500" />
+        </Button>
+      </div>
       <p className="text-xs text-gray-500 mb-4">AI-powered hyperparameter analysis</p>
       
       {loading ? (

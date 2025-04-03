@@ -1,17 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Card,
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Check, ChevronRight, X, AlertCircle, Info, Lightbulb, BookOpen, Settings } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { ArrowLeft, ArrowRight, Book, Code, Lightbulb, Settings, X } from 'lucide-react';
 
 type TutorialStep = {
   title: string;
@@ -27,154 +24,138 @@ interface TutorialProps {
   isVisible: boolean;
 }
 
-const tutorialSteps: TutorialStep[] = [
-  {
-    title: "Welcome to HyperExplainer",
-    description: "This extension helps you understand machine learning hyperparameters found in code. Let's see how it works!",
-    icon: <Info className="w-8 h-8 text-primary" />,
-    image: "/tutorial-images/tutorial-welcome.svg",
-    cta: "Let's start!"
-  },
-  {
-    title: "Find Hyperparameters",
-    description: "When you're viewing code on websites like ChatGPT, HyperExplainer automatically highlights hyperparameters that control machine learning models.",
-    icon: <AlertCircle className="w-8 h-8 text-blue-500" />,
-    image: "/tutorial-images/tutorial-highlight.svg",
-    cta: "Next"
-  },
-  {
-    title: "Get Detailed Explanations",
-    description: "Click on any highlighted parameter to see a detailed explanation of what it does and how it affects model training.",
-    icon: <BookOpen className="w-8 h-8 text-amber-500" />,
-    image: "/tutorial-images/tutorial-explanation.svg",
-    cta: "Next"
-  },
-  {
-    title: "Explore Alternatives",
-    description: "Each explanation includes alternative values you might want to try, with insights on when to use them.",
-    icon: <Lightbulb className="w-8 h-8 text-yellow-500" />,
-    image: "/tutorial-images/tutorial-alternatives.svg",
-    cta: "Next"
-  },
-  {
-    title: "Customize Settings",
-    description: "Access the extension options to customize how HyperExplainer works. You can change highlighting colors, control which frameworks are detected, and more.",
-    icon: <Settings className="w-8 h-8 text-violet-500" />,
-    image: "/tutorial-images/tutorial-settings.svg",
-    cta: "Got it!"
-  }
-];
-
 export function Tutorial({ onComplete, onDismiss, isVisible }: TutorialProps) {
   const [currentStep, setCurrentStep] = useState(0);
-  const [exiting, setExiting] = useState(false);
-  const progress = ((currentStep + 1) / tutorialSteps.length) * 100;
+  
+  const steps: TutorialStep[] = [
+    {
+      title: "Welcome to HyperExplainer",
+      description: "Discover what hyperparameters are and how they affect machine learning models. This extension helps you understand and optimize the parameters in ML code.",
+      icon: <Book className="h-6 w-6 text-indigo-500" />,
+      image: "tutorial-welcome.svg",
+      cta: "Get Started",
+    },
+    {
+      title: "Parameter Detection",
+      description: "HyperExplainer automatically detects hyperparameters in ML code on the page. Parameters are highlighted based on their impact level.",
+      icon: <Code className="h-6 w-6 text-indigo-500" />,
+      image: "tutorial-highlight.svg",
+      cta: "Next",
+    },
+    {
+      title: "Detailed Explanations",
+      description: "Click on any parameter to see a detailed explanation of what it does, how it affects your model, and best practices for setting it.",
+      icon: <Lightbulb className="h-6 w-6 text-indigo-500" />,
+      image: "tutorial-explanation.svg",
+      cta: "Next",
+    },
+    {
+      title: "Alternative Values",
+      description: "Explore alternative parameter values with visualizations showing how each option affects model performance.",
+      icon: <ArrowRight className="h-6 w-6 text-indigo-500" />,
+      image: "tutorial-alternatives.svg",
+      cta: "Next",
+    },
+    {
+      title: "Customize Settings",
+      description: "Configure which ML frameworks to support, set highlight colors, and customize other extension behaviors.",
+      icon: <Settings className="h-6 w-6 text-indigo-500" />,
+      image: "tutorial-settings.svg",
+      cta: "Finish",
+    },
+  ];
 
   const handleNext = () => {
-    if (currentStep < tutorialSteps.length - 1) {
+    if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      setExiting(true);
-      setTimeout(() => {
-        onComplete();
-      }, 300);
+      onComplete();
     }
   };
 
-  const handleDismiss = () => {
-    setExiting(true);
-    setTimeout(() => {
-      onDismiss();
-    }, 300);
+  const handlePrevious = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
   };
+
+  // Reset to first step when tutorial becomes visible
+  useEffect(() => {
+    if (isVisible) {
+      setCurrentStep(0);
+    }
+  }, [isVisible]);
 
   if (!isVisible) return null;
 
+  const currentStepData = steps[currentStep];
+
   return (
-    <AnimatePresence>
-      {!exiting && (
-        <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg max-w-md w-full shadow-xl relative overflow-hidden flex flex-col">
+        {/* Close button */}
+        <button 
+          onClick={onDismiss}
+          className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 z-10"
         >
-          <motion.div
-            className="w-full max-w-md p-2"
-            initial={{ scale: 0.9, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.9, y: 20 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+          <X size={20} />
+        </button>
+        
+        {/* Tutorial step indicator */}
+        <div className="flex space-x-1 absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
+          {steps.map((_, index) => (
+            <div
+              key={index}
+              className={`h-1.5 rounded-full ${
+                index === currentStep ? 'bg-indigo-500 w-5' : 'bg-gray-200 w-2'
+              } transition-all duration-300`}
+            />
+          ))}
+        </div>
+        
+        {/* Step content */}
+        <div className="flex flex-col items-center px-6 pt-12 pb-6">
+          {currentStepData.image && (
+            <div className="w-full h-48 flex items-center justify-center mb-6">
+              <img 
+                src={`tutorial-images/${currentStepData.image}`} 
+                alt={currentStepData.title}
+                className="max-h-full max-w-full object-contain"
+              />
+            </div>
+          )}
+          
+          <div className="bg-indigo-50 p-3 rounded-full mb-4">
+            {currentStepData.icon}
+          </div>
+          
+          <h3 className="text-lg font-bold text-gray-900 mb-2 text-center">
+            {currentStepData.title}
+          </h3>
+          
+          <p className="text-gray-600 text-center mb-6">
+            {currentStepData.description}
+          </p>
+        </div>
+        
+        {/* Navigation buttons */}
+        <div className="flex justify-between items-center px-6 pb-6">
+          <Button
+            variant="ghost"
+            onClick={handlePrevious}
+            disabled={currentStep === 0}
+            className={currentStep === 0 ? 'invisible' : ''}
           >
-            <Card className="w-full overflow-hidden border-2 border-primary/20 shadow-lg">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {tutorialSteps[currentStep].icon}
-                    <CardTitle className="text-xl">
-                      {tutorialSteps[currentStep].title}
-                    </CardTitle>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="rounded-full h-8 w-8" 
-                    onClick={handleDismiss}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                <Progress value={progress} className="h-1 mt-2" />
-              </CardHeader>
-              
-              <CardContent className="px-6 py-4">
-                <div className="min-h-[100px] flex flex-col items-center gap-4">
-                  <CardDescription className="text-base text-center">
-                    {tutorialSteps[currentStep].description}
-                  </CardDescription>
-                  
-                  {tutorialSteps[currentStep].image && (
-                    <div className="w-full h-48 bg-muted rounded-md flex items-center justify-center overflow-hidden">
-                      <img 
-                        src={tutorialSteps[currentStep].image} 
-                        alt={tutorialSteps[currentStep].title}
-                        className="object-cover w-full h-full"
-                      />
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-              
-              <CardFooter className="flex justify-between border-t bg-muted/50 px-6 py-3">
-                <div className="flex gap-1">
-                  {tutorialSteps.map((_, index) => (
-                    <div
-                      key={index}
-                      className={cn(
-                        "w-2 h-2 rounded-full transition-all",
-                        currentStep === index 
-                          ? "bg-primary w-4" 
-                          : index < currentStep 
-                            ? "bg-primary/40" 
-                            : "bg-muted-foreground/20"
-                      )}
-                    />
-                  ))}
-                </div>
-                <Button onClick={handleNext} className="gap-1">
-                  {tutorialSteps[currentStep].cta || "Next"}
-                  {currentStep < tutorialSteps.length - 1 ? (
-                    <ChevronRight className="h-4 w-4" />
-                  ) : (
-                    <Check className="h-4 w-4" />
-                  )}
-                </Button>
-              </CardFooter>
-            </Card>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+          
+          <Button onClick={handleNext} className="bg-indigo-600 hover:bg-indigo-700">
+            {currentStepData.cta || "Next"}
+            {currentStep < steps.length - 1 && <ArrowRight className="ml-2 h-4 w-4" />}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

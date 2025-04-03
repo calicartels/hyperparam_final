@@ -1,37 +1,77 @@
-<svg width="500" height="250" viewBox="0 0 500 250" fill="none" xmlns="http://www.w3.org/2000/svg">
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="500" height="300" viewBox="0 0 500 300" fill="none" xmlns="http://www.w3.org/2000/svg">
   <!-- Background -->
-  <rect width="500" height="250" rx="8" fill="#FFFFFF"/>
+  <rect width="500" height="300" rx="8" fill="#F8F9FC"/>
   
-  <!-- Card background -->
-  <rect x="10" y="10" width="480" height="230" rx="6" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="2"/>
+  <!-- Main Card -->
+  <rect x="50" y="40" width="400" height="220" rx="8" fill="white" stroke="#E2E8F0" stroke-width="1" filter="drop-shadow(0px 4px 6px rgba(0, 0, 0, 0.1))"/>
   
-  <!-- Header -->
-  <rect x="20" y="20" width="460" height="30" rx="4" fill="#F1F5F9"/>
-  <rect x="30" y="30" width="150" height="10" rx="2" fill="#64748B"/>
+  <!-- Card Header -->
+  <rect x="50" y="40" width="400" height="40" rx="8 8 0 0" fill="#F3F4F6"/>
+  <text x="70" y="65" font-family="Arial" font-size="16" font-weight="bold" fill="#111827">Alternative Values</text>
   
-  <!-- Alternative 1 - Higher -->
-  <rect x="20" y="60" width="460" height="50" rx="4" fill="#FEF2F2"/>
-  <rect x="30" y="70" width="80" height="14" rx="2" fill="#EF4444"/>
-  <rect x="30" y="90" width="300" height="10" rx="2" fill="#FB7185"/>
-  <rect x="400" y="70" width="50" height="20" rx="10" fill="#FEE2E2"/>
-  <rect x="405" y="75" width="40" height="10" rx="2" fill="#EF4444"/>
+  <!-- Alternative Pills -->
+  <g transform="translate(70, 100)">
+    <!-- Lower Alternative -->
+    <g transform="translate(0, 0)">
+      <rect x="0" y="0" width="100" height="40" rx="6" fill="#DBEAFE" opacity="0.8">
+        <animate attributeName="opacity" values="0.8;1;0.8" dur="3s" repeatCount="indefinite"/>
+      </rect>
+      <text x="50" y="25" font-family="Arial" font-size="14" font-weight="bold" fill="#1E40AF" text-anchor="middle">0.0001</text>
+    </g>
+    <g transform="translate(110, 0)">
+      <rect x="0" y="0" width="220" height="40" rx="6" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="1"/>
+      <text x="10" y="18" font-family="Arial" font-size="12" fill="#4B5563">Lower value</text>
+      <text x="10" y="33" font-family="Arial" font-size="11" fill="#6B7280">More stable but slower convergence</text>
+    </g>
+  </g>
   
-  <!-- Alternative 2 - Lower -->
-  <rect x="20" y="120" width="460" height="50" rx="4" fill="#ECFDF5"/>
-  <rect x="30" y="130" width="80" height="14" rx="2" fill="#10B981"/>
-  <rect x="30" y="150" width="300" height="10" rx="2" fill="#34D399"/>
-  <rect x="400" y="130" width="50" height="20" rx="10" fill="#D1FAE5"/>
-  <rect x="405" y="135" width="40" height="10" rx="2" fill="#10B981"/>
+  <g transform="translate(70, 150)">
+    <!-- Higher Alternative -->
+    <g transform="translate(0, 0)">
+      <rect x="0" y="0" width="100" height="40" rx="6" fill="#FEE2E2" opacity="0.8">
+        <animate attributeName="opacity" values="0.8;1;0.8" dur="3s" begin="1s" repeatCount="indefinite"/>
+      </rect>
+      <text x="50" y="25" font-family="Arial" font-size="14" font-weight="bold" fill="#B91C1C" text-anchor="middle">0.01</text>
+    </g>
+    <g transform="translate(110, 0)">
+      <rect x="0" y="0" width="220" height="40" rx="6" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="1"/>
+      <text x="10" y="18" font-family="Arial" font-size="12" fill="#4B5563">Higher value</text>
+      <text x="10" y="33" font-family="Arial" font-size="11" fill="#6B7280">Faster learning but may diverge</text>
+    </g>
+  </g>
   
-  <!-- Alternative 3 - Advanced -->
-  <rect x="20" y="180" width="460" height="50" rx="4" fill="#EFF6FF"/>
-  <rect x="30" y="190" width="80" height="14" rx="2" fill="#3B82F6"/>
-  <rect x="30" y="210" width="300" height="10" rx="2" fill="#60A5FA"/>
-  <rect x="400" y="190" width="50" height="20" rx="10" fill="#DBEAFE"/>
-  <rect x="405" y="195" width="40" height="10" rx="2" fill="#3B82F6"/>
+  <g transform="translate(70, 200)">
+    <!-- Advanced Alternative -->
+    <g transform="translate(0, 0)">
+      <rect x="0" y="0" width="100" height="40" rx="6" fill="#E0E7FF" opacity="0.8">
+        <animate attributeName="opacity" values="0.8;1;0.8" dur="3s" begin="2s" repeatCount="indefinite"/>
+      </rect>
+      <text x="50" y="25" font-family="Arial" font-size="14" font-weight="bold" fill="#4338CA" text-anchor="middle">Adaptive</text>
+    </g>
+    <g transform="translate(110, 0)">
+      <rect x="0" y="0" width="220" height="40" rx="6" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="1"/>
+      <text x="10" y="18" font-family="Arial" font-size="12" fill="#4B5563">Advanced option</text>
+      <text x="10" y="33" font-family="Arial" font-size="11" fill="#6B7280">Automatically adjusts during training</text>
+    </g>
+  </g>
   
-  <!-- Animated arrows showing suggestion flow -->
-  <path d="M250 50L250 60M250 110L250 120M250 170L250 180" stroke="#94A3B8" stroke-width="2" stroke-dasharray="4 2">
-    <animate attributeName="stroke-dashoffset" from="6" to="0" dur="1s" repeatCount="indefinite" />
-  </path>
+  <!-- Graph on the side -->
+  <g transform="translate(330, 80)">
+    <circle cx="0" cy="0" r="30" fill="#F3F4F6"/>
+    <path d="M-20,10 Q-10,-30 0,0 T20,10" stroke="#4F46E5" stroke-width="2" fill="none"/>
+    <path d="M-20,10 Q-5,-10 0,0 T20,10" stroke="#EF4444" stroke-width="2" fill="none"/>
+    <path d="M-20,10 Q0,-5 0,0 T20,10" stroke="#10B981" stroke-width="2" fill="none"/>
+    
+    <!-- Moving point along the curves -->
+    <circle cx="0" cy="0" r="3" fill="#4F46E5">
+      <animateMotion path="M-20,10 Q-10,-30 0,0 T20,10" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="0" cy="0" r="3" fill="#EF4444">
+      <animateMotion path="M-20,10 Q-5,-10 0,0 T20,10" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="0" cy="0" r="3" fill="#10B981">
+      <animateMotion path="M-20,10 Q0,-5 0,0 T20,10" dur="3s" repeatCount="indefinite"/>
+    </circle>
+  </g>
 </svg>

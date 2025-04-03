@@ -143,9 +143,42 @@ export function NetworkVisualization({
     
     const params = getNetworkParams();
     
-    // Draw neural network based on the network type and parameters
-    drawNeuralNetwork(ctx, canvas, params, networkType, showAnimation);
+    // For static rendering when animation is off
+    if (!showAnimation) {
+      drawNeuralNetwork(ctx, canvas, params, networkType, false);
+      return;
+    }
     
+    // For animation, set up an animation loop
+    let lastTimestamp = 0;
+    
+    const animateNetwork = (timestamp: number) => {
+      // Calculate time delta
+      if (!lastTimestamp) lastTimestamp = timestamp;
+      const elapsed = timestamp - lastTimestamp;
+      lastTimestamp = timestamp;
+      
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw the network with animation
+      drawNeuralNetwork(ctx, canvas, params, networkType, true, timestamp / 1000);
+      
+      // Continue animation loop
+      const frame = requestAnimationFrame(animateNetwork);
+      setAnimationFrame(frame);
+    };
+    
+    // Start animation loop
+    const frame = requestAnimationFrame(animateNetwork);
+    setAnimationFrame(frame);
+    
+    // Clean up function
+    return () => {
+      if (animationFrame !== null) {
+        cancelAnimationFrame(animationFrame);
+      }
+    };
   }, [selectedValue, networkType, paramName, showAnimation]);
   
   // Clean up animation frame on unmount
@@ -155,7 +188,7 @@ export function NetworkVisualization({
         cancelAnimationFrame(animationFrame);
       }
     };
-  }, [animationFrame]);
+  }, []);
   
   const handleValueChange = (value: number[] | number) => {
     if (Array.isArray(value)) {
@@ -234,7 +267,8 @@ function drawNeuralNetwork(
   canvas: HTMLCanvasElement, 
   params: any,
   networkType: string = 'dense',
-  animate: boolean = false
+  animate: boolean = false,
+  customTime?: number
 ) {
   const { 
     layerCount, 
@@ -253,7 +287,7 @@ function drawNeuralNetwork(
   const activationColor = '#ef4444';
   
   // Set time variable for animation
-  const time = animate ? Date.now() / 1000 : 0;
+  const time = animate ? (customTime !== undefined ? customTime : Date.now() / 1000) : 0;
   
   // Clear the canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height);

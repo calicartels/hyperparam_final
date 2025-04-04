@@ -31,7 +31,16 @@ export default defineConfig({
   },
   root: path.resolve(__dirname, "client"),
   build: {
-    outDir: path.resolve(__dirname, "dist/public"),
-    emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: 'client/index.html',
+        background: 'client/src/background.js',
+        content: 'client/src/content.js'
+      },
+      output: {
+        entryFileNames: '[name].js'
+      }
+    },
+    outDir: 'dist'
   },
 });

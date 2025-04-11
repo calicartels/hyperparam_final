@@ -1,3 +1,4 @@
+// src/lib/llmService.ts
 import { apiRequest } from "./queryClient";
 
 /**
@@ -58,13 +59,21 @@ export interface LLMStatusResponse {
  * @returns Promise with LLM status
  */
 export async function checkLLMStatus(): Promise<LLMStatusResponse> {
-  const response = await apiRequest<LLMStatusResponse>({
-    method: "GET",
-    url: "/api/llm/status",
-    on401: "returnNull",
-  });
-  
-  return response;
+  try {
+    const response = await fetch('/api/llm/status');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to check LLM status:", error);
+    return {
+      available: false,
+      provider: "Unknown",
+      model: "Unknown",
+      requiresAuth: true
+    };
+  }
 }
 
 /**
@@ -75,14 +84,58 @@ export async function checkLLMStatus(): Promise<LLMStatusResponse> {
 export async function getHyperparameterExplanation(
   request: ExplainHyperparameterRequest
 ): Promise<LLMExplanationResponse> {
-  const response = await apiRequest<LLMExplanationResponse>({
-    method: "POST",
-    url: "/api/llm/explain-hyperparameter",
-    body: request,
-    on401: "returnNull",
-  });
-  
-  return response;
+  try {
+    const response = await fetch('/api/llm/explain-hyperparameter', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Error getting hyperparameter explanation:", error);
+    return {
+      success: false,
+      explanation: generateFallbackExplanation(request.paramName, request.paramValue, request.framework),
+      error: `Error: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+/**
+ * Get hyperparameter detection from the LLM service
+ * @param code Code to analyze
+ * @returns Promise with detected parameters
+ */
+export async function detectHyperparametersWithLLM(code: string): Promise<any> {
+  try {
+    const response = await fetch('/api/llm/detect-hyperparameters', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ code }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error("Error detecting hyperparameters:", error);
+    return {
+      success: false,
+      parameters: [],
+      error: `Error: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
 }
 
 /**
@@ -111,218 +164,261 @@ export function generateFallbackExplanation(
     bestPractices: string;
     tradeoffs: string;
   }> = {
-    // Model architecture parameters
-    'model_architecture': {
-      description: "The overall structure and type of the machine learning model being used.",
+    // Learning rate
+    'learning_rate': {
+      description: "Controls how quickly the model updates its weights during training based on the calculated gradients.",
       impact: 'high',
-      valueAnalysis: `The "${paramValue}" architecture is a design choice that defines how the model processes data.`,
+      valueAnalysis: `The value ${paramValue} is a common default that provides a good balance between convergence speed and stability.`,
       alternatives: [
         {
-          value: "Sequential",
-          description: "Simple layer-by-layer architecture for straightforward tasks",
-          type: "advanced"
+          value: "0.0001",
+          description: "More conservative choice that may help with smoother convergence for complex models.",
+          type: "lower"
         },
         {
-          value: "Functional API",
-          description: "More flexible architecture allowing complex layer connections",
-          type: "advanced"
-        }
-      ],
-      bestPractices: "Choose an architecture that matches the complexity of your problem. Simpler architectures are easier to debug and often sufficient for many tasks.",
-      tradeoffs: "More complex architectures can capture more intricate patterns but require more data, compute resources, and are harder to debug."
-    },
-    
-    // Loss function parameters
-    'loss_function': {
-      description: "The function used to measure how well the model performs, which the training process aims to minimize.",
-      impact: 'high',
-      valueAnalysis: `The "${paramValue}" loss function is appropriate for certain types of prediction tasks.`,
-      alternatives: [
-        {
-          value: "categorical_crossentropy",
-          description: "Standard loss for multi-class classification",
-          type: "advanced"
-        },
-        {
-          value: "mse",
-          description: "Mean Squared Error for regression tasks",
-          type: "advanced"
-        }
-      ],
-      bestPractices: "Match your loss function to your task type: classification, regression, ranking, etc.",
-      tradeoffs: "Some loss functions are more sensitive to outliers or class imbalance than others."
-    },
-    
-    // Layer configuration parameters
-    'kernel_size': {
-      description: "The size of the convolutional filter that slides over the input data.",
-      impact: 'medium',
-      valueAnalysis: `A kernel size of ${paramValue} determines the receptive field of each neuron in a convolutional layer.`,
-      alternatives: [
-        {
-          value: "3",
-          description: "Standard size capturing local features",
-          type: "advanced"
-        },
-        {
-          value: "5",
-          description: "Larger receptive field for broader feature capture",
+          value: "0.01",
+          description: "Faster learning but may cause instability or overshooting of optimal parameters.",
           type: "higher"
+        },
+        {
+          value: "ReduceLROnPlateau",
+          description: "Adaptive scheduling that reduces learning rate when metrics plateau.",
+          type: "advanced"
+        },
+        {
+          value: "CyclicLR",
+          description: "Cycles between low and high learning rates to escape local minima.",
+          type: "extreme"
         }
       ],
-      bestPractices: "Smaller kernels (3x3) are often preferred with deeper networks, while larger kernels may be useful in early layers.",
-      tradeoffs: "Larger kernels capture more spatial context but increase computational cost and may lead to overfitting."
+      bestPractices: "Start with 0.001 for Adam optimizer, or 0.01 for SGD. Monitor validation loss for signs of instability or slow convergence, and adjust accordingly.",
+      tradeoffs: "Higher values speed up learning but risk overshooting or divergence. Lower values are more stable but may get stuck in local minima or train too slowly."
     },
     
-    'conv_filters': {
-      description: "The number of different filters (feature detectors) in a convolutional layer.",
+    // Batch size
+    'batch_size': {
+      description: "The number of training examples utilized in one iteration of model training.",
       impact: 'medium',
-      valueAnalysis: `Using ${paramValue} filters allows the model to detect that many different features at this layer.`,
+      valueAnalysis: `A batch size of ${paramValue} balances memory requirements with training stability.`,
       alternatives: [
         {
-          value: "32",
-          description: "Fewer parameters, faster but less expressive",
+          value: "16",
+          description: "Smaller batches provide more frequent updates and better generalization.",
           type: "lower"
         },
         {
           value: "128",
-          description: "More features, potentially better recognition",
+          description: "Larger batches for more stable gradient estimates and better hardware utilization.",
           type: "higher"
-        }
-      ],
-      bestPractices: "Typically, the number of filters increases as you go deeper into the network.",
-      tradeoffs: "More filters can detect more features but increase computational cost and may lead to overfitting with limited data."
-    },
-    
-    // RNN Parameters
-    'bidirectional': {
-      description: "Whether a recurrent neural network processes sequences in both forward and backward directions.",
-      impact: 'high',
-      valueAnalysis: `Bidirectional processing is set to ${paramValue}, affecting how the model captures context from sequences.`,
-      alternatives: [
+        },
         {
-          value: "True",
-          description: "Process data in both directions for better context understanding",
+          value: "Power of 2",
+          description: "Values like 16, 32, 64, 128 optimize GPU memory usage.",
           type: "advanced"
         },
         {
-          value: "False",
-          description: "Process only forward, more suitable for time series or streaming data",
+          value: "Gradient Accumulation",
+          description: "Simulate larger batches on limited memory hardware.",
           type: "advanced"
         }
       ],
-      bestPractices: "Use bidirectional for tasks where future context is available and relevant (like document classification).",
-      tradeoffs: "Bidirectional processing doubles the computational cost but often improves performance for NLP tasks."
+      bestPractices: "Choose the largest batch size that fits in your GPU/TPU memory. Consider reducing batch size if training performance plateaus.",
+      tradeoffs: "Larger batches provide more stable gradient estimates but may lead to poorer generalization. Smaller batches can provide regularization effects but increase training time."
     },
     
-    // Normalization Parameters
-    'normalization_mean': {
-      description: "Mean values used for normalizing input data, often channel-wise for images.",
+    // Dropout
+    'dropout': {
+      description: "A regularization technique that randomly sets a fraction of input units to 0 at each update during training.",
       impact: 'medium',
-      valueAnalysis: `The normalization mean values ${paramValue} help center the data distribution.`,
+      valueAnalysis: `A dropout rate of ${paramValue} provides reasonable regularization for medium-sized networks.`,
       alternatives: [
         {
-          value: "[0.485, 0.456, 0.406]",
-          description: "ImageNet RGB means - good for transfer learning",
-          type: "advanced"
-        },
-        {
-          value: "[0.5, 0.5, 0.5]",
-          description: "Simple centering around zero",
-          type: "advanced"
-        }
-      ],
-      bestPractices: "Use dataset-specific means when possible, or standard values for transfer learning.",
-      tradeoffs: "Proper normalization improves training stability and convergence speed."
-    },
-    
-    // Output Configuration
-    'num_classes': {
-      description: "The number of categories or classes the model is designed to predict.",
-      impact: 'high',
-      valueAnalysis: `The model is configured to predict ${paramValue} different classes.`,
-      alternatives: [
-        {
-          value: "Dataset-specific",
-          description: "Must match your specific dataset classes",
-          type: "advanced"
-        },
-        {
-          value: "Multi-label",
-          description: "Consider multi-label classification if items can belong to multiple classes",
-          type: "advanced"
-        }
-      ],
-      bestPractices: "This parameter must match the actual number of categories in your dataset.",
-      tradeoffs: "More classes generally require more model capacity and training data."
-    },
-    
-    // Default fallback for numeric parameters
-    'numeric': {
-      description: "A parameter that controls an aspect of model training or architecture.",
-      impact: 'medium',
-      valueAnalysis: `The value ${paramValue} is a common setting that provides a balance of performance and generalization.`,
-      alternatives: [
-        {
-          value: isNaN(Number(paramValue)) ? "Lower value" : (Number(paramValue) * 0.5).toString(),
-          description: "A lower value may provide better generalization but slower training.",
+          value: "0.2",
+          description: "Less aggressive dropout for simpler models or when using other regularization methods.",
           type: "lower"
         },
         {
-          value: isNaN(Number(paramValue)) ? "Higher value" : (Number(paramValue) * 2).toString(),
-          description: "A higher value may lead to faster training but could reduce generalization.",
+          value: "0.7",
+          description: "More aggressive dropout for very deep networks prone to overfitting.",
           type: "higher"
+        },
+        {
+          value: "0.0",
+          description: "No dropout - use when overfitting is not a concern or for final fine-tuning.",
+          type: "extreme"
+        },
+        {
+          value: "SpatialDropout",
+          description: "Specialized dropout for convolutional networks, drops entire channels.",
+          type: "advanced"
         }
       ],
-      bestPractices: "It's typically recommended to start with the default value and adjust based on validation performance.",
-      tradeoffs: "Modifying this parameter often involves a tradeoff between training speed, model performance, and generalization ability."
+      bestPractices: "Apply dropout only during training, not during inference. Higher dropout rates often require more training epochs.",
+      tradeoffs: "Higher dropout provides stronger regularization but requires longer training and may result in underfitting. Lower dropout may not sufficiently prevent overfitting."
     },
     
-    // Default fallback for boolean or string parameters
-    'categorical': {
-      description: "A configuration choice that affects model behavior.",
+    // Epochs
+    'epochs': {
+      description: "The number of complete passes through the training dataset.",
       impact: 'medium',
-      valueAnalysis: `The choice "${paramValue}" is one of several possible configurations for this setting.`,
+      valueAnalysis: `Training for ${paramValue} epochs provides a reasonable training duration for many tasks.`,
       alternatives: [
         {
-          value: paramValue === "True" ? "False" : "True",
-          description: "The alternative setting may be more appropriate for different use cases.",
+          value: "5",
+          description: "Fewer epochs for simple datasets or when fine-tuning pretrained models.",
+          type: "lower"
+        },
+        {
+          value: "100",
+          description: "More epochs for complex tasks that require longer learning.",
+          type: "higher"
+        },
+        {
+          value: "Early Stopping",
+          description: "Use validation performance to determine when to stop training.",
           type: "advanced"
         },
         {
-          value: "Custom configuration",
-          description: "For advanced use cases, a custom configuration might be optimal.",
+          value: "ReduceLROnPlateau + patience",
+          description: "Reduce learning rate when progress plateaus, then stop after no improvement.",
+          type: "advanced"
+        }
+      ],
+      bestPractices: "Use early stopping with a validation set to prevent overfitting. Monitor validation metrics to determine optimal training duration.",
+      tradeoffs: "More epochs allow better convergence but increase risk of overfitting and computational cost. Fewer epochs may not allow the model to fully learn the data patterns."
+    },
+    
+    // Activation functions
+    'activation': {
+      description: "Non-linear function applied to the output of a layer to introduce complex patterns into the model.",
+      impact: 'medium',
+      valueAnalysis: `The '${paramValue}' activation function is a common choice that works well for many neural network architectures.`,
+      alternatives: [
+        {
+          value: "sigmoid",
+          description: "Useful for binary classification output layers, maps to range [0,1].",
+          type: "advanced"
+        },
+        {
+          value: "tanh",
+          description: "Maps to range [-1,1], often used in RNNs.",
+          type: "advanced"
+        },
+        {
+          value: "leaky_relu",
+          description: "Variant of ReLU that allows small negative values, preventing 'dying ReLU' problem.",
+          type: "advanced"
+        },
+        {
+          value: "gelu",
+          description: "Gaussian Error Linear Unit, smoother than ReLU, used in transformers.",
           type: "extreme"
         }
       ],
-      bestPractices: "Consider the specific requirements of your task when choosing this configuration option.",
-      tradeoffs: "Different settings offer tradeoffs in terms of model complexity, training speed, and performance."
+      bestPractices: "Use ReLU or variants for hidden layers in most networks. For output layers, use activation appropriate for the task (softmax for multi-class, sigmoid for binary).",
+      tradeoffs: "Different activations have different properties regarding gradient flow, computational efficiency, and expressiveness."
+    },
+    
+    // Optimizer
+    'optimizer': {
+      description: "Algorithm used to update network weights to minimize the loss function.",
+      impact: 'high',
+      valueAnalysis: `The '${paramValue}' optimizer is a solid choice that adapts learning rates per parameter.`,
+      alternatives: [
+        {
+          value: "SGD",
+          description: "Simple but may require careful tuning of learning rate and momentum.",
+          type: "advanced"
+        },
+        {
+          value: "RMSprop",
+          description: "Good for RNNs and problems with noisy gradients.",
+          type: "advanced"
+        },
+        {
+          value: "AdamW",
+          description: "Adam with proper weight decay, often works well for large models.",
+          type: "advanced"
+        },
+        {
+          value: "LARS/LAMB",
+          description: "Specialized optimizers for large batch training.",
+          type: "extreme"
+        }
+      ],
+      bestPractices: "Adam is a good default choice. SGD with momentum often works better for computer vision tasks with sufficient tuning.",
+      tradeoffs: "Adaptive optimizers like Adam converge faster but may generalize worse than well-tuned SGD. Different optimizers require different learning rates."
+    },
+    
+    // Loss function
+    'loss': {
+      description: "Function that measures how well the model's predictions match the ground truth.",
+      impact: 'high',
+      valueAnalysis: `The '${paramValue}' loss function is appropriate for multi-class classification tasks.`,
+      alternatives: [
+        {
+          value: "binary_crossentropy",
+          description: "For binary classification tasks where output is probability.",
+          type: "advanced"
+        },
+        {
+          value: "mse",
+          description: "Mean Squared Error for regression tasks.",
+          type: "advanced"
+        },
+        {
+          value: "focal_loss",
+          description: "Modified cross-entropy that focuses on hard examples, good for imbalanced datasets.",
+          type: "advanced"
+        },
+        {
+          value: "custom_loss",
+          description: "Implement problem-specific loss function for specialized requirements.",
+          type: "extreme"
+        }
+      ],
+      bestPractices: "Match loss function to the task type. Use categorical_crossentropy for multi-class, binary_crossentropy for binary, and MSE for regression.",
+      tradeoffs: "Different loss functions prioritize different aspects of model performance. Some are more sensitive to outliers or imbalanced classes."
+    },
+    
+    // Default fallback
+    'default': {
+      description: "A configurable aspect of the machine learning model that affects its behavior and performance.",
+      impact: 'medium',
+      valueAnalysis: `The value ${paramValue} represents a specific configuration choice for this parameter.`,
+      alternatives: [
+        {
+          value: "Lower value",
+          description: "A reduced value might be appropriate for simpler models or to reduce computational requirements.",
+          type: "lower"
+        },
+        {
+          value: "Higher value",
+          description: "An increased value could provide better model capacity at the cost of more computation.",
+          type: "higher"
+        },
+        {
+          value: "Alternative approach",
+          description: "Consider a different approach depending on your specific use case.",
+          type: "advanced"
+        }
+      ],
+      bestPractices: "Experiment with different values through cross-validation. Consider the specific requirements of your dataset and task.",
+      tradeoffs: "Most hyperparameter choices involve trade-offs between model complexity, computational efficiency, and generalization performance."
     }
   };
   
   // Determine if we have a specific description for this parameter type
-  let paramType = paramName;
-  
-  // If we don't have a specific entry, determine if it's numeric or categorical
-  if (!paramTypeDescriptions[paramType]) {
-    if (!isNaN(Number(paramValue)) || paramValue.includes('[') || paramValue.includes('.')) {
-      paramType = 'numeric';
-    } else {
-      paramType = 'categorical';
-    }
-  }
-  
-  // Get the description for this parameter type
-  const paramDesc = paramTypeDescriptions[paramType];
+  let parameterInfo = paramTypeDescriptions[paramName] || paramTypeDescriptions['default'];
   
   // Generate the explanation
   return {
     name: formattedName,
-    description: paramDesc.description,
-    impact: paramDesc.impact,
-    valueAnalysis: paramDesc.valueAnalysis,
-    alternatives: paramDesc.alternatives,
-    bestPractices: paramDesc.bestPractices,
-    tradeoffs: paramDesc.tradeoffs
+    description: parameterInfo.description,
+    impact: parameterInfo.impact,
+    valueAnalysis: parameterInfo.valueAnalysis,
+    alternatives: parameterInfo.alternatives,
+    bestPractices: parameterInfo.bestPractices,
+    tradeoffs: parameterInfo.tradeoffs
   };
 }

@@ -34,13 +34,11 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'client/index.html',
-        background: 'client/src/background.js',
-        content: 'client/src/content.js'
       },
       output: {
         entryFileNames: '[name].js'
       }
     },
-    outDir: 'dist'
+    outDir: '../dist'
   },
 });

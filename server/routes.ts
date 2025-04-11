@@ -1,24 +1,18 @@
+// server/routes.ts
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { z } from "zod";
-// VertexAI import is now handled within hyperparameterService
-// import { VertexAI } from "@google-cloud/vertexai";
 import hyperparameterRouter from './hyperparameterService';
-
-// Initialization logic is now handled within hyperparameterService
-// let vertexai: VertexAI | null = null;
-// function initializeVertexAI() { ... }
+import hyperparameterAnalysisRouter from './hyperparameterAnalysisService';
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Vertex AI initialization is handled by its own service
-  // const vertexInitialized = initializeVertexAI();
-  // console.log(`Vertex AI initialization status at startup: ${vertexInitialized ? 'SUCCESS' : 'FAILED'}`);
-
-  // Use the hyperparameter service router, which includes LLM routes
+  // Use the hyperparameter service router for basic LLM routes
   app.use(hyperparameterRouter);
+  
+  // Use the new hyperparameter analysis service for advanced analysis
+  app.use(hyperparameterAnalysisRouter);
 
-  // API route to get all hyperparameters (presumably from storage, not LLM)
+  // API route to get all hyperparameters (from storage)
   app.get("/api/hyperparameters", async (req, res) => {
     try {
       const hyperparameters = await storage.getAllHyperparameters();
@@ -69,21 +63,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // REMOVED: Duplicate LLM status route (/api/llm/status)
-  // app.get("/api/llm/status", ...) {
-  // });
-
-  // REMOVED: Duplicate LLM explain route (/api/llm/explain-hyperparameter)
-  // app.post("/api/llm/explain-hyperparameter", ...) {
-  // });
-
-  // REMOVED: Duplicate LLM detect route (/api/llm/detect-hyperparameters)
-  // app.post("/api/llm/detect-hyperparameters", ...) {
-  // });
-
-  // API route to get a code explanation
+  // API route to get a code explanation (for future use)
   app.post("/api/explain-code", async (req: Request, res: Response) => {
-    // ... existing code ...
+    // Future implementation
+    res.status(501).json({ message: "Not implemented yet" });
   });
 
   const httpServer = createServer(app);

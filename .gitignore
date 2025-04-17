@@ -24,6 +24,6 @@ Thumbs.db
 # IDE / Editor directories
 .vscode/
 .idea/
-
+CLAUDE.md
 # Generated files (add others if needed)
 generated-icon.png
